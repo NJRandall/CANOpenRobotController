@@ -1,0 +1,113 @@
+#   MTRobot parameter file
+#
+#   2-DOF parallel-linkage tabletop therapy robot.
+#   This file is the canonical source — it lives outside the CORC submodule.
+#   CMakeLists.txt copies it to build/config/ at configure time so that
+#   Robot::initialiseFromYAML() can find it during NO_ROBOT development builds.
+#
+#   Arm geometry sourced from System Modelling/torquecalc (1).m.
+#   Joint limits sourced from System Modelling/ROM (1).m and accelCalc (1).m.
+#
+#   To load this file, construct RobotMTR with:
+#       RobotMTR("RobotMTR", "MTR_params.yaml")
+#
+#   Parameter status legend:
+#     VERIFIED   — confirmed against hardware or datasheet
+#     ESTIMATE   — reasonable guess; replace after system identification
+#     MUST VERIFY — MUST be measured on physical robot before use
+#
+#   Diagram (top view, horizontal plane)
+#
+#   Origin (shoulder)
+#       ●──────────────● θ₁  (proximal joint, Drive 1, CAN ID 1)
+#                       └─────────────── θ₂  (elbow, Drive 2, CAN ID 3)
+#                                        └── ● Handle (end-effector)
+#
+#   θ₁ ∈ [−30°, 100°]   measured from the +X axis (world frame, at shoulder)
+#   θ₂ ∈ [−160°, −30°]  measured from the +X axis (world frame, at shoulder — parallel linkage)
+#
+
+RobotMTR:
+
+  # ── Geometry ─────────────────────────────────────────────────────────────────
+  # Status: MUST VERIFY — measure physical links before enabling forward kinematics.
+  # Source: System Modelling/torquecalc (1).m
+  L1: 0.43          # Proximal link length [m]  (shoulder → elbow pivot)
+  L2: 0.37          # Distal   link length [m]  (elbow pivot → handle)
+
+  # Not used in FK or Jacobian — θ₂ is the absolute world-frame angle of link 2
+  # (parallel linkage; link 2 angle is independent of link 1 rotation).
+  parallel_ratio: 1.0
+
+  # ── Drive envelope ────────────────────────────────────────────────────────────
+  # dqMax — JOINT velocity safety limit [deg/s at the joint output shaft].
+  #   JointMT divides drive velocity by reductionRatio=15, so 200 deg/s at the joint
+  #   = 3000 deg/s (500 rpm) at the motor — well within Maxon EC60 rated speed.
+  #   Only enforced when NOT calibrated (pre-calibration safety check).
+  #   After calibration the end-effector velocity limit (2.0 m/s, hardcoded) is active.
+  dqMax:  200        # [deg/s at joint]
+
+  # tauMax — JOINT torque command cap [N·m at the joint output shaft].
+  #   JointMT applies reductionRatio=15, so ALL torque values here are joint torques:
+  #     Motor rated torque:    0.319 N·m  (nameplate — VERIFIED via 0x6076 readback)
+  #     Joint rated torque:    0.319 × 15 = 4.785 N·m
+  #   Current value 3.0 N·m joint = 0.2 N·m motor = 63% motor rated — safe for testing.
+  #   Can raise toward 4.785 N·m joint (= 0.319 N·m motor rated) for more force;
+  #   do not exceed 4.785 N·m joint in sustained therapy (overheats motor above that).
+  #   Applied in JointMT::setTorque() and setEndEffForceWithCompensation() (saturation).
+  tauMax:  3.0       # [N·m at joint]
+
+  # tauSafetyMax — measured JOINT torque emergency-stop threshold [N·m at joint].
+  #   Applied ONLY after calibration (so wake-and-wiggle phasing current never trips it).
+  #   Must be strictly > tauMax. 6.0 = 2 × tauMax = 0.4 N·m motor — catches genuine
+  #   runaway without false-tripping normal impedance commands.
+  tauSafetyMax: 6.0  # [N·m at joint] — must be > tauMax
+
+  # ── Per-joint drive parameters ────────────────────────────────────────────────
+  # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.
+  #   Rated current = 0.319 N·m / 0.114 N·m/A = 2.795 A (nameplate).
+  #   NOTE: 6.0 A is the Copley ACK-055-06 drive's continuous output ceiling —
+  #   NOT the motor rated current. Sustained motor torque > 0.319 N·m overheats the motor.
+  iPeakDrives:  [2.795, 2.795]   # Maxon EC60 rated current [A]
+  motorCstt:    [0.114, 0.114]   # Maxon EC60 torque constant Kt [N·m/A]
+
+  # Status: VERIFIED — confirmed correct directions during motor spin tests.
+  #   Joint 0 (shoulder): sign=-1 — positive joint torque cmd → positive joint angle change → drives to θ₁_max
+  #   Joint 1 (elbow):    sign=+1 — positive joint torque cmd → drives toward θ₂_min (more negative)
+  qSigns:       [1, 1]
+
+  # ── Joint limits ──────────────────────────────────────────────────────────────
+  # Status: MUST VERIFY — these are design values from system modelling.
+  #   Confirm actual mechanical limits by commanding motion toward each stop.
+  # Format: [θ1_min, θ1_max, θ2_min, θ2_max] in degrees
+  # Limits are set 2° beyond the physical hard stops so encoder noise while the arm
+  # sits against a stop does not immediately trigger the e-stop. JointMT torque
+  # clipping and the mechanical stops prevent the arm exceeding the true stop angle.
+  qLimits: [-50, 101, -136, 62]
+
+  # ── Calibration ───────────────────────────────────────────────────────────────
+  # Status: MUST VERIFY — these are the KNOWN joint angles at each mechanical hard stop.
+  #   Procedure: physically measure the true joint angle at each stop from robot geometry,
+  #   or run CalibState and verify the arm position matches expected geometry at completion.
+  #   NOTE: The q=[...] printout during CalibState shows PRE-calibration raw encoder values
+  #   relative to power-on position — those numbers do NOT directly give the stop angle.
+  #   Wrong qCalibration values corrupt ALL kinematics and force control.
+  # Format: [θ₁_cal_deg, θ₂_cal_deg]
+  #   Joint 0 (shoulder): pressing encoder/Enter in CalibState labels current position as 100°
+  #   Joint 1 (elbow):    pressing encoder/Enter in CalibState labels current position as −50°
+  qCalibration: [100, -50]   # [θ₁_cal_deg, θ₂_cal_deg] in degrees — MUST VERIFY on hardware
+
+  # ── Friction model ────────────────────────────────────────────────────────────
+  # Status: ESTIMATE — replace after system identification.
+  #   All values here are in JOINT N·m (reductionRatio=15 applied in JointMT).
+  #   Set both to 0.0 for initial therapy testing; add back after measuring on hardware.
+  # Applied in setEndEffForceWithCompensation():
+  #   τ_fric = frictionCoul × sign(dq) + frictionVis × dq   (gated by 0.03 rad/s deadband)
+  frictionVis:  [0.33, 0.76]    # Viscous  [N·m·s/rad at joint] — zeroed until system ID
+  frictionCoul: [0.35, 0.19]    # Coulomb  [N·m at joint]       — zeroed until system ID
+
+  # ── Safety envelope ──────────────────────────────────────────────────────────
+  # Status: VERIFIED reasonable — motors physically cannot produce 20 N at end-effector
+  #   (~5 N max from joint torque via Jᵀ), so this cap is a backstop against calculation errors.
+  #   Review before clinical use with patients.
+  maxEndEffForce: 20.0        # Max end-effector contact force (XY) [N]

@@ -50,6 +50,7 @@ void I2CDevice::initDevice( ) {
 
 void I2CDevice::setBusPaths( ) {
     this->_Bus[ 1 ].BusPath = validateBusPath( (char *)I2C_1 );
+    this->_Bus[ 2 ].BusPath = validateBusPath( (char *)I2C_2 );
 }
 
 void I2CDevice::selectABusPath( ) { this->DeviceBusPath = _Bus[ this->BusId ].BusPath; }

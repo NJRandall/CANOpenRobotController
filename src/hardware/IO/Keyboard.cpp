@@ -67,6 +67,10 @@ void Keyboard::setKeys() {
         case 'Q':
             currentKeyStates.q = true;
             break;
+        case '\n':
+        case '\r':
+            currentKeyStates.enter = true;
+            break;
         default:
             keyboardActive = 0;
     }
@@ -95,6 +99,7 @@ void Keyboard::clearCurrentStates() {
     currentKeyStates.w = false;
     currentKeyStates.x = false;
     currentKeyStates.q = false;
+    currentKeyStates.enter = false;
     for(unsigned int i=0; i<10; i++)
         currentKeyStates.Nb[i] = false;
     currentKeyStates.key_code = -1;
@@ -117,6 +122,9 @@ bool Keyboard::getX() {
 }
 bool Keyboard::getQ() {
     return currentKeyStates.q;
+}
+bool Keyboard::getEnter() {
+    return currentKeyStates.enter;
 }
 int Keyboard::getNb() {
     for(unsigned int i=0; i<currentKeyStates.Nb.size(); i++) {

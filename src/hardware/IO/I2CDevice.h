@@ -25,8 +25,9 @@
 #include "logging.h"
 
 
-#define I2C_BUS_COUNT   1               //!< How many I2C buses are available. Add paths below as required.
-#define I2C_1           "/dev/i2c-1"    //!< File Path for the i2c-1 bus (one used on BB)
+#define I2C_BUS_COUNT   2               //!< How many I2C buses are available. Add paths below as required.
+#define I2C_1           "/dev/i2c-1"    //!< File Path for the i2c-1 bus
+#define I2C_2           "/dev/i2c-2"    //!< File Path for the i2c-2 bus (P9_19/P9_20 on BBB)
 
 #define ONE_BYTE        1               //!< Used for specifying how many bytes to read
 #define TWO_BYTES       2               //!< Used for specifying how many bytes to write
@@ -50,7 +51,7 @@ class I2CDevice {
         /**
          \fn Public Destructor
          */
-        ~I2CDevice();
+        virtual ~I2CDevice();
 
         /**
          \fn Public Constructor
@@ -131,7 +132,7 @@ class I2CDevice {
          \fn Private Struct I2CBus
          \brief used to store Bus Paths for ease of access.
          */
-        struct I2CBus { const char * BusPath; } _Bus[ I2C_BUS_COUNT ];
+        struct I2CBus { const char * BusPath; } _Bus[ I2C_BUS_COUNT + 1 ]; // 1-indexed: _Bus[1].._Bus[I2C_BUS_COUNT]
 
         /**
          \brief used to check file paths.

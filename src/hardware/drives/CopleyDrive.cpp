@@ -5,11 +5,13 @@
 #include "CopleyDrive.h"
 
 #include <iostream>
+#include <unistd.h>
 
 CopleyDrive::CopleyDrive(int NodeID) : Drive::Drive(NodeID) {
-    OD_Addresses[DIGITAL_IN] = {0x219A, 0x00}; //Use INPUT PIN STATE instead of standard DI. Not tested.
-    OD_Addresses[DIGITAL_OUT] = {0X2194, 0x00}; //Not tested. Need dedicated configuration before use. See Copley doc.
-    RPDO_MappedObjects[1] = {CONTROL_WORD}; //No DO mapping on Copley drive
+    OD_Addresses[DIGITAL_IN] = {0x219A, 0x00};
+    OD_Addresses[DIGITAL_OUT] = {0X2194, 0x00};
+    RPDO_MappedObjects[1] = {CONTROL_WORD};   // no DIGITAL_OUT mapping on Copley
+    TPDO_MappedObjects[4] = {};               // 0x219A is not PDO-mappable on Copley drives
 
 }
 CopleyDrive::~CopleyDrive() {
@@ -40,19 +42,24 @@ bool CopleyDrive::initPosControl(motorProfile posControlMotorProfile) {
 
 bool CopleyDrive::initVelControl(motorProfile velControlMotorProfile) {
     spdlog::debug("NodeID {} Initialising Velocity Control", NodeID);
-    /**
-     * \todo create velControlMOTORPROFILE and test on exo
-     * \todo Tune velocity loop gain index 0x2381 to optimize V control
-     *
-    */
     sendSDOMessages(generateVelControlConfigSDO(velControlMotorProfile));
     return true;
 }
 
+bool CopleyDrive::initVelControl() {
+    spdlog::debug("NodeID {} Initialising Velocity Control (default profile)", NodeID);
+    motorProfile p;
+    p.profileVelocity     = 500000;   // max profile velocity — tune as needed
+    p.profileAcceleration = 100000;   // ramp up in ~1 second at target speed
+    p.profileDeceleration = 100000;
+    sendSDOMessages(Drive::generateVelControlConfigSDO(p));
+    return true;
+}
+
+
 bool CopleyDrive::initTorqueControl() {
     spdlog::debug("NodeID {} Initialising Torque Control", NodeID);
     sendSDOMessages(generateTorqueControlConfigSDO());
-
     return true;
 }
 

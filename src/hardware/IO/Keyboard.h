@@ -33,6 +33,7 @@ typedef struct keys {
     bool w;
     bool x;
     bool q;
+    bool enter;
     std::vector<bool> Nb;//Number keys
     int key_code;
 } key_states;
@@ -109,6 +110,7 @@ class Keyboard : public InputDevice {
      *
      */
     bool getQ();
+    bool getEnter();
     /**
      * \brief Getter method for number keys
      * \return Return nb of first nb key pressed, -1 if no number key is pressed.
