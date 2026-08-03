@@ -83,7 +83,7 @@ RobotMTR:
   # Limits are set 2° beyond the physical hard stops so encoder noise while the arm
   # sits against a stop does not immediately trigger the e-stop. JointMT torque
   # clipping and the mechanical stops prevent the arm exceeding the true stop angle.
-  qLimits: [-50, 101, -136, 62]
+  qLimits: [-360, 360, -360, 360] # TODO: REINSTATE JOINT LIMITS — MUST VERIFY on hardware
 
   # ── Calibration ───────────────────────────────────────────────────────────────
   # Status: MUST VERIFY — these are the KNOWN joint angles at each mechanical hard stop.
@@ -95,7 +95,7 @@ RobotMTR:
   # Format: [θ₁_cal_deg, θ₂_cal_deg]
   #   Joint 0 (shoulder): pressing encoder/Enter in CalibState labels current position as 100°
   #   Joint 1 (elbow):    pressing encoder/Enter in CalibState labels current position as −50°
-  qCalibration: [100, -50]   # [θ₁_cal_deg, θ₂_cal_deg] in degrees — MUST VERIFY on hardware
+  qCalibration: [0, 0]   # [θ₁_cal_deg, θ₂_cal_deg] in degrees — MUST VERIFY on hardware
 
   # ── Friction model ────────────────────────────────────────────────────────────
   # Status: ESTIMATE — replace after system identification.
