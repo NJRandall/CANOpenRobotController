@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Configure CAN1 pins"
+echo "Configure CAN1 pins" #TODO: address potential redunacy
 #sudo config-pin p9.24 can
 #sudo config-pin p9.26 can
 echo "Enabling CAN1"
