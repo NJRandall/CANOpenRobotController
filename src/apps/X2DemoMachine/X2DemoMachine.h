@@ -45,7 +45,7 @@ public:
 
 
 protected:
-    X2Robot *robot() { return static_cast<X2Robot*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    X2Robot *robot() { return static_cast<X2Robot*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
 
 private:
 

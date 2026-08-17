@@ -34,7 +34,7 @@ class LoggingDevice : public StateMachine {
     
     bool trajComplete;
 
-    LoggingRobot *robot() { return static_cast<LoggingRobot*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    LoggingRobot *robot() { return static_cast<LoggingRobot*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
 };
 
 #endif

@@ -31,7 +31,7 @@ class M1DemoMachine : public StateMachine {
     ~M1DemoMachine();
     void init();
 
-    RobotM1 *robot() { return static_cast<RobotM1*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    RobotM1 *robot() { return static_cast<RobotM1*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
 };
 
 #endif /*M1_SM_H*/

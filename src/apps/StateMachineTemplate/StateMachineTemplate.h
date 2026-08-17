@@ -34,7 +34,7 @@ class StateMachineTemplate : public StateMachine {
 
     void hwStateUpdate();
 
-    PlatformName *robot() { return static_cast<PlatformName*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    PlatformName *robot() { return static_cast<PlatformName*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
 
     std::shared_ptr<FLNLHelper> UIserver = nullptr;     //!< Pointer to communication server
 };

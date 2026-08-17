@@ -52,7 +52,7 @@ X2ROS2DemoMachine::configureMasterPDOs()
 X2Robot *
 X2ROS2DemoMachine::get_robot()
 {
-    return static_cast<X2Robot *>(robot(0));
+    return static_cast<X2Robot *>(_robot.get());
 }
 
 const std::shared_ptr<X2ROS2Node> &
