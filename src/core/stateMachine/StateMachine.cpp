@@ -6,22 +6,29 @@ StateMachine::StateMachine(): _lastToState(""), _running(false){
 
 void StateMachine::setRobot(std::unique_ptr<Robot> r) {
     spdlog::debug("StateMachine::setRobot()");
-    if(!_robot) {
-        _robot = move(r);
+    if(_robots.empty()) {
+        _robots.push_back(move(r));
     }
     else {
-        spdlog::error("Robot already set to state machine. Can't re-set.");
+        spdlog::error("Robot already set to state machine. Can't re-set. Use addRobot/addRobotAt to add more robots.");
     }
 }
 
 bool StateMachine::configureMasterPDOs() {
     spdlog::debug("StateMachine::configureMasterPDOs()");
-    if(_robot) {
-        return _robot->configureMasterPDOs();
-    }
-    else {
+    if(_robots.empty()) {
         return false;
     }
+    bool all_ok = true;
+    for(const auto &r: _robots) {
+        if(r) {
+            all_ok = r->configureMasterPDOs() && all_ok;
+        }
+        else {
+            all_ok = false;
+        }
+    }
+    return all_ok;
 }
 
 void StateMachine::setInitState(std::string state_name) {
@@ -136,8 +143,8 @@ void StateMachine::update() {
 
 void StateMachine::hwStateUpdate() {
     spdlog::trace("StateMachine::hwStateUpdate()");
-    if(_robot) {
-        _robot->updateRobot();
+    for(const auto &r: _robots) {
+        if(r) r->updateRobot();
     }
 }
 
@@ -146,7 +153,43 @@ void StateMachine::end() {
         if(logHelper.isInitialised())
             logHelper.endLog();
         state()->doExit();
-        _robot->disable();
+        for(const auto &r: _robots) {
+            if(r) r->disable();
+        }
     }
     _running=false;
+}
+
+size_t StateMachine::addRobot(std::unique_ptr<Robot> r) {
+    _robots.push_back(move(r));
+    return _robots.size() - 1;
+}
+
+bool StateMachine::addRobotAt(std::unique_ptr<Robot> r, size_t idx) {
+    if(idx < _robots.size()) {
+        if(_robots[idx]) {
+            spdlog::error("Robot already exists at index {}. Use removeRobot() first.", idx);
+            return false;
+        }
+        _robots[idx] = move(r);
+        return true;
+    }
+    // resize and assign
+    _robots.resize(idx + 1);
+    _robots[idx] = move(r);
+    return true;
+}
+
+Robot * StateMachine::robot(size_t idx) {
+    if(idx < _robots.size() && _robots[idx]) return _robots[idx].get();
+    return nullptr;
+}
+
+std::unique_ptr<Robot> StateMachine::removeRobot(size_t idx) {
+    if(idx < _robots.size()) {
+        auto tmp = std::move(_robots[idx]);
+        _robots[idx] = nullptr;
+        return tmp;
+    }
+    return nullptr;
 }

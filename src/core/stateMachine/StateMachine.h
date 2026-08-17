@@ -17,6 +17,7 @@
 #include "State.h"
 #include "Robot.h"
 #include "LogHelper.h"
+#include <vector>
 
 class StateMachine; //Forward declaration for following type definitions
 
@@ -88,6 +89,31 @@ class StateMachine {
      *
      */
     void setRobot(std::unique_ptr<Robot> r);
+    /**
+     * \brief Add a Robot instance to the stateMachine. Returns the index assigned to the robot.
+     */
+    size_t addRobot(std::unique_ptr<Robot> r);
+
+    /**
+     * \brief Add/assign a Robot at a specific index. Resizes internal storage if needed.
+     * Returns true on success, false if a robot already exists at the index.
+     */
+    bool addRobotAt(std::unique_ptr<Robot> r, size_t idx);
+
+    /**
+     * \brief Return pointer to the Robot specified by index (default 0). Returns nullptr if not present.
+     */
+    Robot * robot(size_t idx = 0);
+
+    /**
+     * \brief Remove robot at index and return ownership. Returns nullptr if none.
+     */
+    std::unique_ptr<Robot> removeRobot(size_t idx);
+
+    /**
+     * \brief Number of robots registered in the StateMachine.
+     */
+    size_t robotCount() const { return _robots.size(); }
 
      /**
      * \brief Add a State instance to the stateMachine.
@@ -156,7 +182,7 @@ class StateMachine {
      */
     virtual void hwStateUpdate();
 
-    std::unique_ptr<Robot> _robot = nullptr;        //!< Set using setRobot method. Can be left null.
+    std::vector<std::unique_ptr<Robot>> _robots;    //!< Vector of robots; index-based access. First robot remains default for legacy behaviour.
 
     /**
      * \brief Custom spdlogger allowing to conveniently log Eigen Vectors (among other things)
