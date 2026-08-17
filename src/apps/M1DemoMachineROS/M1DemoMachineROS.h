@@ -35,7 +35,7 @@ class M1DemoMachineROS : public StateMachine {
 
     void hwStateUpdate();
 
-    RobotM1 *robot() { return static_cast<RobotM1*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    RobotM1 *robot() { return static_cast<RobotM1*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
    protected:
     M1MachineROS *M1MachineRos_; /*<!Pointer to the ROS Class*/
 

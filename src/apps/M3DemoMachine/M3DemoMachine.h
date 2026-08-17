@@ -34,7 +34,7 @@ class M3DemoMachine : public StateMachine {
 
     void hwStateUpdate();
 
-    RobotM3 *robot() { return static_cast<RobotM3*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    RobotM3 *robot() { return static_cast<RobotM3*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
 
     std::shared_ptr<FLNLHelper> UIserver = nullptr;     //!< Pointer to communication server
 };

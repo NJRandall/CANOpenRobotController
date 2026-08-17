@@ -34,7 +34,7 @@ class FITHVExoDemoMachine : public StateMachine {
 
     void hwStateUpdate();
 
-    RobotFITHVExo *robot() { return static_cast<RobotFITHVExo*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
+    RobotFITHVExo *robot() { return static_cast<RobotFITHVExo*>(robot(0)); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
 
     std::shared_ptr<FLNLHelper> UIserver = nullptr;     //!< Pointer to communication server
 };
