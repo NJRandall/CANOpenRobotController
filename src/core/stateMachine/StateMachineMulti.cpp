@@ -5,23 +5,26 @@ MultiStateMachine::MultiStateMachine(): _lastToState(""), _running(false){
 }
 
 void MultiStateMachine::setRobot(std::unique_ptr<Robot> r) {
-    spdlog::debug("MultiStateMachine::setRobot()");
-    if(!_robot) {
-        _robot = move(r);
-    }
-    else {
-        spdlog::error("Robot already set to state machine. Can't re-set.");
-    }
+    spdlog::debug("MultiStateMachine::setRobot() -> addRobot()");
+    // For the multi-robot state machine, setRobot will append to the robot vector.
+    _robots.push_back(std::move(r));
 }
 
 bool MultiStateMachine::configureMasterPDOs() {
     spdlog::debug("MultiStateMachine::configureMasterPDOs()");
-    if(_robot) {
-        return _robot->configureMasterPDOs();
-    }
-    else {
+    if(_robots.empty()) {
         return false;
     }
+    bool all_ok = true;
+    for(auto &rptr : _robots) {
+        if(rptr) {
+            all_ok = all_ok && rptr->configureMasterPDOs();
+        }
+        else {
+            all_ok = false;
+        }
+    }
+    return all_ok;
 }
 
 void MultiStateMachine::setInitState(std::string state_name) {
@@ -128,8 +131,8 @@ void MultiStateMachine::update() {
 
 void MultiStateMachine::hwStateUpdate() {
     spdlog::trace("MultiStateMachine::hwStateUpdate()");
-    if(_robot) {
-        _robot->updateRobot();
+    for(auto &rptr : _robots) {
+        if(rptr) rptr->updateRobot();
     }
 }
 
@@ -138,7 +141,9 @@ void MultiStateMachine::end() {
         if(logHelper.isInitialised())
             logHelper.endLog();
         state()->doExit();
-        _robot->disable();
+        for(auto &rptr : _robots) {
+            if(rptr) rptr->disable();
+        }
     }
     _running=false;
 }

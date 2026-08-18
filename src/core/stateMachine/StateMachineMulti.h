@@ -48,7 +48,15 @@ class MultiStateMachine {
    protected:
     virtual void hwStateUpdate();
 
-    std::unique_ptr<Robot> _robot = nullptr;        //!< Set using setRobot method. Can be left null.
+    std::vector<std::unique_ptr<Robot>> _robots;    //!< Vector of robots managed by the multi state machine
+
+    /**
+     * 
+     * Robot accessors for multi-robot usage
+     */
+    void addRobot(std::unique_ptr<Robot> r);
+    size_t robotCount() const { return _robots.size(); }
+    Robot* robot(size_t idx) { return _robots[idx].get(); }
     LogHelper logHelper;
 
    private:
