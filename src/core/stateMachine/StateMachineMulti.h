@@ -25,6 +25,13 @@ class MultiStateMachine {
     MultiStateMachine();
     virtual ~MultiStateMachine(){};
 
+    // Non-copyable: ownership of Robots is unique (std::unique_ptr)
+    MultiStateMachine(const MultiStateMachine&) = delete;
+    MultiStateMachine& operator=(const MultiStateMachine&) = delete;
+    // Allow move semantics
+    MultiStateMachine(MultiStateMachine&&) = default;
+    MultiStateMachine& operator=(MultiStateMachine&&) = default;
+
     void setInitState(std::string state_name);
     void activate();
     virtual void update();
@@ -42,6 +49,10 @@ class MultiStateMachine {
     std::shared_ptr<S> state(std::string state_name) { return std::static_pointer_cast<S>(_states[state_name]); }
     std::shared_ptr<State> state() { return _states[_currentState]; }
 
+    // Safe robot accessors
+    Robot* robotAt(size_t idx) { return (idx < _robots.size()) ? _robots[idx].get() : nullptr; }
+    const Robot* robotAt(size_t idx) const { return (idx < _robots.size()) ? _robots[idx].get() : nullptr; }
+
     bool running() { return _running; }
     double & runningTime() { return _time_running; }
 
@@ -54,7 +65,7 @@ class MultiStateMachine {
      * 
      * Robot accessors for multi-robot usage
      */
-    void addRobot(std::unique_ptr<Robot> r);
+    
     size_t robotCount() const { return _robots.size(); }
     Robot* robot(size_t idx) { return _robots[idx].get(); }
     LogHelper logHelper;
