@@ -52,6 +52,8 @@ class MultiStateMachine {
     // Safe robot accessors
     Robot* robotAt(size_t idx) { return (idx < _robots.size()) ? _robots[idx].get() : nullptr; }
     const Robot* robotAt(size_t idx) const { return (idx < _robots.size()) ? _robots[idx].get() : nullptr; }
+    size_t robotCount() const { return _robots.size(); }
+    Robot* robot(size_t idx) { return _robots[idx].get(); }
 
     bool running() { return _running; }
     double & runningTime() { return _time_running; }
@@ -61,13 +63,6 @@ class MultiStateMachine {
 
     std::vector<std::unique_ptr<Robot>> _robots;    //!< Vector of robots managed by the multi state machine
 
-    /**
-     * 
-     * Robot accessors for multi-robot usage
-     */
-    
-    size_t robotCount() const { return _robots.size(); }
-    Robot* robot(size_t idx) { return _robots[idx].get(); }
     LogHelper logHelper;
 
    private:

@@ -41,11 +41,11 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              iPeak, kt,
                              new CopleyDrive(node), jname));
     }
-
+}
 
 // Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
-    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {}
+    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {
     addInput(keyboard = new Keyboard());
 
     // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
