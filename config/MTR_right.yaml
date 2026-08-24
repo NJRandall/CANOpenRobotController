@@ -1,0 +1,28 @@
+# MTR right-drive parameters (derived from MTR_params.yaml)
+# This config is for testing MultiStateMachine with two single-drive robots.
+
+RobotMTRRight:
+
+  L1: 0.43
+  L2: 0.37
+  parallel_ratio: 1.0
+
+  dqMax: 200
+  tauMax: 3.0
+  tauSafetyMax: 6.0
+
+  # Single drive parameters (right / joint 1)
+  iPeakDrives: [2.795]
+  motorCstt:   [0.114]
+  qSigns:      [1]
+
+  qLimits: [-360, 360]
+  qCalibration: [0]
+
+  frictionVis: [0.76]
+  frictionCoul: [0.19]
+
+  maxEndEffForce: 20.0
+
+  # CAN/CORC network settings — set node id unique for this drive
+  canNodeID: 3
