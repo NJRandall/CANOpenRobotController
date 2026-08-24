@@ -15,28 +15,37 @@ using namespace std;
 // Construction / destruction
 // ═══════════════════════════════════════════════════════════════════════════════
 
-RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
+// New overload constructs joints based on explicit drive_node_ids
+RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
+                   const std::vector<int> &drive_node_ids)
     : Robot(robot_name, yaml_config_file) {
 
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
-    // SHOULDER
-     addJoint(new JointMT(0,
-                          qLimits[0], qLimits[1],          // θ₁ min / max
-                          (short int)qSigns[0],
-                          -dqMax, dqMax,
-                          -tauMax, tauMax,
-                          iPeakDrives[0], motorCstt[0],
-                          new CopleyDrive(1), "q1"));
-    // ELBOW
-    addJoint(new JointMT(1,
-                         qLimits[2], qLimits[3],          // θ₂ min / max
-                         (short int)qSigns[1],
-                         -dqMax, dqMax,
-                         -tauMax, tauMax,
-                         iPeakDrives[1], motorCstt[1],
-                         new CopleyDrive(3), "q2"));
 
+    // Construct one JointMT per provided drive node id. Indexing into parameter
+    // vectors uses element i for each single-joint robot.
+    for (size_t i = 0; i < drive_node_ids.size(); ++i) {
+        int node = drive_node_ids[i];
+        double qmin = qLimits.size() > 2*i ? qLimits[2*i] : qLimits[0];
+        double qmax = qLimits.size() > 2*i+1 ? qLimits[2*i+1] : qLimits[1];
+        double iPeak = iPeakDrives.size() > i ? iPeakDrives[i] : iPeakDrives[0];
+        double kt = motorCstt.size() > i ? motorCstt[i] : motorCstt[0];
+        short int qsign = qSigns.size() > i ? (short int)qSigns[i] : (short int)qSigns[0];
+        std::string jname = "q" + std::to_string(i+1);
+        addJoint(new JointMT((int)i,
+                             qmin, qmax,
+                             qsign,
+                             -dqMax, dqMax,
+                             -tauMax, tauMax,
+                             iPeak, kt,
+                             new CopleyDrive(node), jname));
+    }
+
+
+// Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
+RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
+    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {}
     addInput(keyboard = new Keyboard());
 
     // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
@@ -66,7 +75,8 @@ RobotMTR::~RobotMTR() {
 
 void RobotMTR::fillParam(YAML::Node node, vector<double> &vec) {
     if (node) {
-        for (unsigned int i = 0; i < vec.size(); i++)
+        unsigned int n = std::min((unsigned int)vec.size(), (unsigned int)node.size());
+        for (unsigned int i = 0; i < n; i++)
             vec[i] = node[i].as<double>();
     }
 }
@@ -104,8 +114,10 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     }
 
     if (p["qCalibration"]) {
-        qCalibration[0] = p["qCalibration"][0].as<double>() * M_PI / 180.;
-        qCalibration[1] = p["qCalibration"][1].as<double>() * M_PI / 180.;
+        if (p["qCalibration"].size() > 0)
+            qCalibration[0] = p["qCalibration"][0].as<double>() * M_PI / 180.;
+        if (p["qCalibration"].size() > 1)
+            qCalibration[1] = p["qCalibration"][1].as<double>() * M_PI / 180.;
     }
 
     spdlog::info("RobotMTR: Loaded YAML parameters for '{}'"
