@@ -109,7 +109,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     fillParam(p["frictionCoul"], frictionCoul);
 
     if (p["qLimits"]) {
-        for (unsigned int i = 0; i < qLimits.size(); i++)
+        unsigned int n = std::min((unsigned int)qLimits.size(), (unsigned int)p["qLimits"].size());
+        for (unsigned int i = 0; i < n; i++)
             qLimits[i] = p["qLimits"][i].as<double>() * M_PI / 180.;
     }
 
