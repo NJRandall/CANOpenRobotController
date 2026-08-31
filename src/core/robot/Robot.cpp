@@ -31,8 +31,17 @@ bool Robot::initialiseFromYAML(std::string yaml_config_file) {
                 return loadParametersFromYAML(params);
             }
 
+        } catch (const YAML::Exception &e) {
+            spdlog::error("Failed loading parameters from {} (YAML exception: {}). Using default parameters instead.",
+                          baseDirectory + relativeFilePath + yaml_config_file, e.what());
+            return false;
+        } catch (const std::exception &e) {
+            spdlog::error("Failed loading parameters from {} (exception: {}). Using default parameters instead.",
+                          baseDirectory + relativeFilePath + yaml_config_file, e.what());
+            return false;
         } catch (...) {
-            spdlog::error("Failed loading parameters from {}. Using default parameters instead.", baseDirectory + relativeFilePath + yaml_config_file);
+            spdlog::error("Failed loading parameters from {} (unknown exception). Using default parameters instead.",
+                          baseDirectory + relativeFilePath + yaml_config_file);
             return false;
         }
     }
