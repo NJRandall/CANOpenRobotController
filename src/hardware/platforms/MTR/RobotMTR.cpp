@@ -41,23 +41,23 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              iPeak, kt,
                              new CopleyDrive(node), jname));
     }
-}
 
-// Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
-RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
-    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {
     addInput(keyboard = new Keyboard());
 
     // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
     addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
 
-    // 16×2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
+    // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
     lcd = new LCD1602(0x27, 2);
     lcd->init();
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
 }
+
+// Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
+RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
+    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {}
 
 RobotMTR::~RobotMTR() {
     for (auto p : joints) delete p;
