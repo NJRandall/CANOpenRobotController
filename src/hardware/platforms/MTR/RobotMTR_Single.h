@@ -1,6 +1,8 @@
 /**
- * Thin single-drive wrapper for RobotMTR used for multi-robot testing.
- * This class forwards construction to RobotMTR with a single drive node id.
+ * Thin wrapper for RobotMTR used for multi-robot testing (e.g. left/right arm).
+ * Forwards construction to RobotMTR with an arbitrary set of drive node ids,
+ * so a single "arm" instance can grow from one drive to several without
+ * changing how MTRobotMachine registers it.
  */
 #ifndef ROBOTMTR_SINGLE_H
 #define ROBOTMTR_SINGLE_H
@@ -11,8 +13,8 @@ class RobotMTRSingle : public RobotMTR {
    public:
     RobotMTRSingle(const std::string &robot_name = "RobotMTRSingle",
                    const std::string &yaml_config_file = "",
-                   int drive_node_id = 1)
-        : RobotMTR(robot_name, yaml_config_file, std::vector<int>{drive_node_id}) {}
+                   std::vector<int> drive_node_ids = {1})
+        : RobotMTR(robot_name, yaml_config_file, drive_node_ids) {}
 
     ~RobotMTRSingle() {}
 };

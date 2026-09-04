@@ -111,3 +111,61 @@ RobotMTR:
   #   (~5 N max from joint torque via Jᵀ), so this cap is a backstop against calculation errors.
   #   Review before clinical use with patients.
   maxEndEffForce: 20.0        # Max end-effector contact force (XY) [N]
+
+# ══════════════════════════════════════════════════════════════════════════════
+#   Single-drive robots for MultiStateMachine testing (left / right arm)
+#   Both keyed off this same file — pass "MTR_params.yaml" as yaml_config_file
+#   for both RobotMTRLeft and RobotMTRRight so only one file needs maintaining.
+# ══════════════════════════════════════════════════════════════════════════════
+
+RobotMTRLeft:
+
+  L1: 0.43
+  L2: 0.37
+  parallel_ratio: 1.0
+
+  dqMax: 200
+  tauMax: 3.0
+  tauSafetyMax: 6.0
+
+  # Single drive parameters (left / joint 0)
+  iPeakDrives: [2.795]
+  motorCstt:   [0.114]
+  qSigns:      [1]
+
+  qLimits: [-360, 360]
+  qCalibration: [0]
+
+  frictionVis: [0.33]
+  frictionCoul: [0.35]
+
+  maxEndEffForce: 20.0
+
+  # CAN/CORC network settings — set node id unique for this drive
+  canNodeID: 1
+
+RobotMTRRight:
+
+  L1: 0.43
+  L2: 0.37
+  parallel_ratio: 1.0
+
+  dqMax: 200
+  tauMax: 3.0
+  tauSafetyMax: 6.0
+
+  # Single drive parameters (right / joint 1)
+  iPeakDrives: [2.795]
+  motorCstt:   [0.114]
+  qSigns:      [1]
+
+  qLimits: [-360, 360]
+  qCalibration: [0]
+
+  frictionVis: [0.76]       # ← Different from left
+  frictionCoul: [0.19]      # ← Different from left
+
+  maxEndEffForce: 20.0
+
+  # CAN/CORC network settings — set node id unique for this drive
+  canNodeID: 3
