@@ -16,7 +16,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ################################## USER FLAGS ##################################
 
 ### Select the application by setting the state machine app.cmake to use
-include(src/apps/ExoTestMachine/app.cmake)
+include(../MTRobotMachine/app.cmake)
+#include(src/apps/ExoTestMachine/app.cmake)
 #include(src/apps/FITHVExoDemoMachine/app.cmake)
 #include(src/apps/M1DemoMachine/app.cmake)
 #include(src/apps/M1DemoMachineROS/app.cmake)

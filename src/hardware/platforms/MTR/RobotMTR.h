@@ -155,16 +155,17 @@ class RobotMTR : public Robot {
     std::vector<double> frictionCoul = {0.0, 0.0};   //!< Coulomb  [N·m]
 
     // Joint limits [rad] layout: {θ1_min, θ1_max, θ2_min, θ2_max}
+    // TODO: LIMITS REMOVED NEED TO BE REINSTATED ONCE HARDWARE VERIFIED — see MTR_params.yaml
     std::vector<double> qLimits = {
-        -30.0 * M_PI / 180.0,    100.0 * M_PI / 180.0,   // θ₁ ∈ [−30°, 100°]
-       -160.0 * M_PI / 180.0,    -30.0 * M_PI / 180.0    // θ₂ ∈ [−160°, −30°]
+        -360.0 * M_PI / 180.0,    360.0 * M_PI / 180.0,   // θ₁ ∈ [−30°, 100°]
+        -360.0 * M_PI / 180.0,    160.0 * M_PI / 180.0    // θ₂ ∈ [−160°, −30°]
     };
 
     // MUST VERIFY against physical robot — measure true joint angles at each hard stop.
     // Joint 0 stops at θ₁_max; joint 1 stops at θ₂_min (see MTR_params.yaml for procedure).
     VM2 qCalibration = {
-         100.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
-        -160.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
+         0.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
+         0.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
     };
 
     bool calibrated      = false;
