@@ -85,6 +85,7 @@ RobotMTR:
     link_thickness: 0.08    # [m] physical link diameter
     boundary: 0.02          # [m] extra clearance around each link
     link_A_length: 0.20     # [m] MUST VERIFY; shorter parallel link
+    joint_radius: 0.02      # [m] physical radius around link joints
 
   # ── Per-joint drive parameters ────────────────────────────────────────────────
   # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.

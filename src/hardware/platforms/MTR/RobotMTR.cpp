@@ -120,6 +120,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
             collisionBoundary = max(0., collision["boundary"].as<double>());
         if (collision["link_A_length"])
             collisionLinkALength = max(0., collision["link_A_length"].as<double>());
+        if (collision["joint_radius"])
+            collisionJointRadius = max(0., collision["joint_radius"].as<double>());
     }
 
     // Safety envelope
@@ -330,7 +332,10 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
         {toWorkspace(origin), toWorkspace(endL1), radius, collisionBoundary},
         {toWorkspace(endL1), toWorkspace(endL2), radius, collisionBoundary},
         {toWorkspace(origin), toWorkspace(endA), radius, collisionBoundary},
-        {toWorkspace(endA), toWorkspace(endB), radius, collisionBoundary}
+        {toWorkspace(endA), toWorkspace(endB), radius, collisionBoundary},
+        {toWorkspace(origin), collisionJointRadius, collisionBoundary},
+        {toWorkspace(endL1), collisionJointRadius, collisionBoundary},
+        {toWorkspace(endA), collisionJointRadius, collisionBoundary}
     };
 }
 
