@@ -81,6 +81,13 @@ struct MTRJointHitbox {
     double boundary; //!< Additional collision clearance outside the radius [m]
 };
 
+struct MTRFrameHitbox {
+    VM2 center;       //!< Rectangle centre in the shared workspace [m]
+    VM2 halfExtents;  //!< Half-width and half-height in the frame-local axes [m]
+    double yaw;       //!< Rectangle orientation in the shared workspace [rad]
+    double boundary;  //!< Additional clearance around the rectangle [m]
+};
+
 struct MTRCollisionHitboxes {
     MTRLinkHitbox L1; //!< Primary link from the origin using q1
     MTRLinkHitbox L2; //!< Primary link from the end of L1 using q2
@@ -89,6 +96,7 @@ struct MTRCollisionHitboxes {
     MTRJointHitbox origin;
     MTRJointHitbox elbowL1L2;
     MTRJointHitbox elbowAB;
+    MTRFrameHitbox frame;
 };
 
 class RobotMTR : public Robot {
@@ -182,6 +190,11 @@ class RobotMTR : public Robot {
     double collisionBoundary = 0.02;             //!< Extra clearance [m]
     double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
     double collisionJointRadius = 0.05;          //!< Physical joint radius [m]
+    double collisionFrameCenterX = 0.0;           //!< Frame centre x in base frame [m]
+    double collisionFrameCenterY = 0.0;           //!< Frame centre y in base frame [m]
+    double collisionFrameWidth = 0.60;            //!< Frame width [m]
+    double collisionFrameHeight = 0.40;           //!< Frame height [m]
+    double collisionFrameBoundary = 0.02;         //!< Frame clearance [m]
 
     // Drive envelope — loaded from MTR_params.yaml (these are YAML defaults; YAML overrides at runtime)
     double dqMax        = 200.0 * M_PI / 180.0;  //!< Max JOINT speed  [rad/s] (200 deg/s joint = 3000 deg/s motor)

@@ -122,6 +122,19 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
             collisionLinkALength = max(0., collision["link_A_length"].as<double>());
         if (collision["joint_radius"])
             collisionJointRadius = max(0., collision["joint_radius"].as<double>());
+        YAML::Node frame = collision["frame"];
+        if (frame) {
+            if (frame["center_x"])
+                collisionFrameCenterX = frame["center_x"].as<double>();
+            if (frame["center_y"])
+                collisionFrameCenterY = frame["center_y"].as<double>();
+            if (frame["width"])
+                collisionFrameWidth = max(0., frame["width"].as<double>());
+            if (frame["height"])
+                collisionFrameHeight = max(0., frame["height"].as<double>());
+            if (frame["boundary"])
+                collisionFrameBoundary = max(0., frame["boundary"].as<double>());
+        }
     }
 
     // Safety envelope
@@ -326,6 +339,7 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
     VM2 endA = VM2(collisionLinkALength * std::cos(q[1]),
                    collisionLinkALength * std::sin(q[1]));
     VM2 endB = endA + VM2(L1 * std::cos(q[0]), L1 * std::sin(q[0]));
+    VM2 frameCenterLocal(collisionFrameCenterX, collisionFrameCenterY);
 
     double radius = 0.5 * collisionLinkThickness;
     return MTRCollisionHitboxes{
@@ -335,7 +349,11 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
         {toWorkspace(endA), toWorkspace(endB), radius, collisionBoundary},
         {toWorkspace(origin), collisionJointRadius, collisionBoundary},
         {toWorkspace(endL1), collisionJointRadius, collisionBoundary},
-        {toWorkspace(endA), collisionJointRadius, collisionBoundary}
+        {toWorkspace(endA), collisionJointRadius, collisionBoundary},
+        {toWorkspace(frameCenterLocal),
+         VM2(0.5 * collisionFrameWidth, 0.5 * collisionFrameHeight),
+         collisionBaseYaw,
+         collisionFrameBoundary}
     };
 }
 

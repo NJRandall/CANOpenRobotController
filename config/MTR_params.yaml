@@ -86,6 +86,12 @@ RobotMTR:
     boundary: 0.02          # [m] extra clearance around each link
     link_A_length: 0.20     # [m] MUST VERIFY; shorter parallel link
     joint_radius: 0.02      # [m] physical radius around link joints
+    frame:
+      center_x: 0.0         # [m] frame centre relative to robot base
+      center_y: 0.0         # [m] frame centre relative to robot base
+      width: 0.60           # [m]
+      height: 0.40          # [m]
+      boundary: 0.02        # [m] extra clearance around the frame
 
   # ── Per-joint drive parameters ────────────────────────────────────────────────
   # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.
