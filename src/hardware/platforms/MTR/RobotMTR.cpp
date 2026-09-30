@@ -101,6 +101,12 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (p["tauSafetyMax"]) tauSafetyMax = max(tauMax, p["tauSafetyMax"].as<double>());
     if (p["qDampingWidth"]) qDampingWidth = max(0., p["qDampingWidth"].as<double>()) * M_PI / 180.;
     if (p["qDampingGain"])  qDampingGain  = max(0., p["qDampingGain"].as<double>());
+    if (p["singularityDampingAngleExtended"])
+        singularityDampingAngleExtended = max(0., p["singularityDampingAngleExtended"].as<double>()) * M_PI / 180.;
+    if (p["singularityDampingAngleFolded"])
+        singularityDampingAngleFolded = max(0., p["singularityDampingAngleFolded"].as<double>()) * M_PI / 180.;
+    if (p["singularityDampingGain"])
+        singularityDampingGain = max(0., p["singularityDampingGain"].as<double>());
 
     // Safety envelope
     if (p["maxEndEffForce"]) maxEndEffForce = max(0., p["maxEndEffForce"].as<double>());
@@ -364,6 +370,11 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 setMovementReturnCode_t RobotMTR::setJointTorque(VM2 tau) {
+    if (joints.size() > 1) {
+        VM2 q(joints[0]->getPosition(), joints[1]->getPosition());
+        VM2 dq(joints[0]->getVelocity(), joints[1]->getVelocity());
+        tau += singularityDampingTorque(q, dq);
+    }
     return applyTorque({tau[0], tau[1]});
 }
 
@@ -373,6 +384,34 @@ setMovementReturnCode_t RobotMTR::setJointPosition(VM2 q) {
 
 setMovementReturnCode_t RobotMTR::setJointVelocity(VM2 dq) {
     return applyVelocity({dq[0], dq[1]});
+}
+
+VM2 RobotMTR::singularityDampingTorque(VM2 q, VM2 dq) const {
+    if (singularityDampingGain <= 0.0)
+        return VM2::Zero();
+
+    double delta = q[1] - q[0];
+    double wrappedDelta = std::atan2(std::sin(delta), std::cos(delta));
+    bool approachingExtended = std::abs(wrappedDelta) <= M_PI / 2.0;
+    double distance = approachingExtended
+                    ? std::abs(wrappedDelta)
+                    : M_PI - std::abs(wrappedDelta);
+    double dampingAngle = approachingExtended
+                        ? singularityDampingAngleExtended
+                        : singularityDampingAngleFolded;
+    if (dampingAngle <= 0.0 || distance >= dampingAngle || distance < 1e-9)
+        return VM2::Zero();
+
+    double direction = wrappedDelta < 0.0 ? -1.0 : 1.0;
+    VM2 gradient = approachingExtended
+                 ? VM2(-direction, direction)
+                 : VM2(direction, -direction);
+    double distanceRate = gradient.dot(dq);
+    if (distanceRate >= 0.0)
+        return VM2::Zero();
+
+    double activation = 1.0 - distance / dampingAngle;
+    return -singularityDampingGain * activation * distanceRate * gradient;
 }
 
 

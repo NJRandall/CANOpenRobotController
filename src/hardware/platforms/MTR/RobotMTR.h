@@ -152,6 +152,9 @@ class RobotMTR : public Robot {
     double tauSafetyMax =   6.0;                  //!< Measured-torque e-stop [N·m joint]; must be > tauMax
     double qDampingWidth = 10.0 * M_PI / 180.0;   //!< Soft-limit damping band [rad]
     double qDampingGain  = 0.5;                   //!< Soft-limit viscous gain [N·m·s/rad]
+    double singularityDampingAngleExtended = 15.0 * M_PI / 180.0; //!< Extended singularity band [rad]
+    double singularityDampingAngleFolded   = 15.0 * M_PI / 180.0; //!< Folded singularity band [rad]
+    double singularityDampingGain          = 0.5;                 //!< Singularity viscous gain [N·m·s/rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)
@@ -201,6 +204,7 @@ class RobotMTR : public Robot {
     setMovementReturnCode_t applyTorque(std::vector<double> torques);
     setMovementReturnCode_t applyPosition(std::vector<double> positions);
     setMovementReturnCode_t applyVelocity(std::vector<double> velocities);
+    VM2 singularityDampingTorque(VM2 q, VM2 dq) const;
 };
 
 #endif  // ROBOTMTR_H

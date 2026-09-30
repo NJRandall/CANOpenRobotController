@@ -70,6 +70,12 @@ RobotMTR:
   qDampingWidth: 10.0   # [deg] before each q limit
   qDampingGain:  0.5    # [N·m·s/rad] viscous damping toward each stop
 
+  # ── Robot-level singularity damping ─────────────────────────────────────────
+  # Applies near both fully-extended and fully-folded configurations.
+  singularityDampingAngleExtended: 15.0  # [deg] from fully extended
+  singularityDampingAngleFolded:   15.0  # [deg] from fully folded
+  singularityDampingGain:            0.5 # [N·m·s/rad] damping opposing approach
+
   # ── Per-joint drive parameters ────────────────────────────────────────────────
   # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.
   #   Rated current = 0.319 N·m / 0.114 N·m/A = 2.795 A (nameplate).
