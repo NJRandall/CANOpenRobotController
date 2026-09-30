@@ -71,19 +71,25 @@ typedef Eigen::VectorXd VX;    //!< Dynamic-size vector (for FLNLHelper / loggin
 
 class RobotMTR : public Robot {
    public:
-    // Original two-arg constructor retained for backward compatibility
+    // Original two-arg constructor retained for backward compatibility (master: has UI hardware)
     RobotMTR(const std::string &robot_name      = "RobotMTR",
              const std::string &yaml_config_file = "");
 
-    // Overload allowing explicit drive node ids (single-drive test wrapper uses this)
+    // Overload allowing explicit drive node ids (single-drive test wrapper uses this).
+    // isMaster: true (default) constructs the Keyboard/RotaryEncoder/LCD1602 UI hardware —
+    // only one physical unit should be master. A non-master instance leaves keyboard/encoder/lcd
+    // as nullptr: it only drives its motors over CAN, matching the doc's "listening BB" role.
     RobotMTR(const std::string &robot_name,
              const std::string &yaml_config_file,
-             const std::vector<int> &drive_node_ids);
+             const std::vector<int> &drive_node_ids,
+             bool isMaster = true);
     ~RobotMTR();
 
-    Keyboard      *keyboard;  //!< Keyboard input (fallback / development)
-    RotaryEncoder *encoder;   //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15)
-    LCD1602       *lcd;       //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27)
+    bool isMaster() const { return isMaster_; }
+
+    Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
+    RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
+    LCD1602       *lcd      = nullptr;  //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27) — master only
 
     // ── Drive mode initialisation ─────────────────────────────────────────────
     bool initTorqueControl()   override;
@@ -177,6 +183,7 @@ class RobotMTR : public Robot {
     bool calibrated      = false;
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
+    bool isMaster_        = true; // true: constructs keyboard/encoder/lcd; false: CAN-only follower
 
     // ── Safety envelope ───────────────────────────────────────────────────────
     double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]

@@ -17,8 +17,8 @@ using namespace std;
 
 // New overload constructs joints based on explicit drive_node_ids
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
-                   const std::vector<int> &drive_node_ids)
-    : Robot(robot_name, yaml_config_file) {
+                   const std::vector<int> &drive_node_ids, bool isMaster)
+    : Robot(robot_name, yaml_config_file), isMaster_(isMaster) {
 
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
@@ -42,14 +42,19 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              new CopleyDrive(node), jname));
     }
 
-    addInput(keyboard = new Keyboard());
+    // UI hardware (keyboard/encoder/LCD) is master-only: a non-master unit has none of
+    // this physically wired — it only drives its motors over CAN — so keyboard/encoder/lcd
+    // stay nullptr (their in-class initialisers) rather than aliasing the master's hardware.
+    if (isMaster_) {
+        addInput(keyboard = new Keyboard());
 
-    // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
-    addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
+        // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
+        addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
 
-    // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
-    lcd = new LCD1602(0x27, 2);
-    lcd->init();
+        // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
+        lcd = new LCD1602(0x27, 2);
+        lcd->init();
+    }
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
