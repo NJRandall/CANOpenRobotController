@@ -68,6 +68,19 @@
 typedef Eigen::Vector2d VM2;   //!< 2-vector (planar XY workspace)
 typedef Eigen::VectorXd VX;    //!< Dynamic-size vector (for FLNLHelper / logging)
 
+struct MTRLinkHitbox {
+    VM2 start;       //!< Centreline start point in the shared workspace [m]
+    VM2 end;         //!< Centreline end point in the shared workspace [m]
+    double radius;   //!< Physical link radius [m]
+    double boundary; //!< Additional collision clearance outside the radius [m]
+};
+
+struct MTRCollisionHitboxes {
+    MTRLinkHitbox L1; //!< Primary link from the origin using q1
+    MTRLinkHitbox L2; //!< Primary link from the end of L1 using q2
+    MTRLinkHitbox A;  //!< Parallel link from the origin using q2
+    MTRLinkHitbox B;  //!< Parallel link from the end of A using q1
+};
 
 class RobotMTR : public Robot {
    public:
@@ -116,6 +129,12 @@ class RobotMTR : public Robot {
     /** Returns VM2::Zero() — horizontal plane, gravity is perpendicular. */
     VM2 calculateGravityTorques();
 
+    /** Build the four link hitboxes from the current calibrated joint positions. */
+    MTRCollisionHitboxes getCollisionHitboxes() const;
+
+    /** Build the four link hitboxes for a supplied joint configuration. */
+    MTRCollisionHitboxes getCollisionHitboxes(VM2 q) const;
+
     // ── Joint-space setters ───────────────────────────────────────────────────
     setMovementReturnCode_t setJointTorque(VM2 tau);
     setMovementReturnCode_t setJointPosition(VM2 q);
@@ -145,6 +164,14 @@ class RobotMTR : public Robot {
     double L1             = 0.43;   //!< Proximal link [m]  (MUST VERIFY)
     double L2             = 0.37;   //!< Distal   link [m]  (MUST VERIFY)
     double parallel_ratio = 1.0;    //!< Joint-2 parallelogram transmission ratio
+
+    // Robot pose and link collision geometry in the shared workspace.
+    double collisionBaseX = 0.0;                 //!< Shoulder x position [m]
+    double collisionBaseY = 0.0;                 //!< Shoulder y position [m]
+    double collisionBaseYaw = 0.0;               //!< Robot base rotation [rad]
+    double collisionLinkThickness = 0.08;        //!< Link diameter [m]
+    double collisionBoundary = 0.02;             //!< Extra clearance [m]
+    double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
 
     // Drive envelope — loaded from MTR_params.yaml (these are YAML defaults; YAML overrides at runtime)
     double dqMax        = 200.0 * M_PI / 180.0;  //!< Max JOINT speed  [rad/s] (200 deg/s joint = 3000 deg/s motor)

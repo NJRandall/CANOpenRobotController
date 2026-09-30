@@ -63,20 +63,28 @@ setMovementReturnCode_t JointMT::setVelocity(double dqd) {
 }
 
 setMovementReturnCode_t JointMT::setTorque(double taud) {
-    // Add viscous resistance near either configured joint stop.
+    // Apply soft-limit damping only after calibration, when position is in the
+    // calibrated q coordinate system used by qMin and qMax.
     if (calibrated && qDampingWidth > 0.0 && qDampingGain > 0.0) {
         double dampingTorque = 0.0;
         double distanceToMin = position - qMin;
         double distanceToMax = qMax - position;
+
+        // At the lower stop, negative velocity moves toward qMin, so apply
+        // positive opposing torque. At the upper stop, the signs are reversed.
         if (distanceToMin < qDampingWidth && velocity < 0.0) {
             dampingTorque = -qDampingGain * velocity;
         } else if (distanceToMax < qDampingWidth && velocity > 0.0) {
             dampingTorque = -qDampingGain * velocity;
         }
+
+        // This is viscous damping: it opposes approach velocity but does not
+        // create a spring force that would hold the joint away from the stop.
         taud += dampingTorque;
     }
 
-    // Position protection first only if calibrated
+    // Once a mechanical stop has been reached, reject commanded torque farther
+    // into it. Torque away from the stop remains available for recovery.
     if (calibrated) {
         if (position <= qMin && taud < 0) {
             taud = 0;
