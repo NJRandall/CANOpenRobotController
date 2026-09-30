@@ -1,11 +1,12 @@
 #include "JointMT.h"
 
 
-JointMT::JointMT(int jointID, double q_min, double q_max, short int sign_, double dq_min, double dq_max, double tau_min, double tau_max, double ipeak, double motor_kt, Drive *drive, const std::string& name) :   Joint(jointID, q_min, q_max, drive, name),
+JointMT::JointMT(int jointID, double q_min, double q_max, short int sign_, double dq_min, double dq_max, double tau_min, double tau_max, double ipeak, double motor_kt, Drive *drive, const std::string& name, double q_damping_width, double q_damping_gain) :   Joint(jointID, q_min, q_max, drive, name),
                                                                                                                                                                 sign(sign_),
                                                                                                                                                                 qMin(q_min), qMax(q_max),
                                                                                                                                                                 dqMin(dq_min), dqMax(dq_max),
                                                                                                                                                                 tauMin(tau_min), tauMax(tau_max),
+                                                                                                                                                                qDampingWidth(q_damping_width), qDampingGain(q_damping_gain),
                                                                                                                                                                 Ipeak(ipeak),
                                                                                                                                                                 motorTorqueConstant(motor_kt)
                                                                                                                                                                 {
@@ -62,7 +63,20 @@ setMovementReturnCode_t JointMT::setVelocity(double dqd) {
 }
 
 setMovementReturnCode_t JointMT::setTorque(double taud) {
-    //Position protection first only if calibrated
+    // Add viscous resistance near either configured joint stop.
+    if (calibrated && qDampingWidth > 0.0 && qDampingGain > 0.0) {
+        double dampingTorque = 0.0;
+        double distanceToMin = position - qMin;
+        double distanceToMax = qMax - position;
+        if (distanceToMin < qDampingWidth && velocity < 0.0) {
+            dampingTorque = -qDampingGain * velocity;
+        } else if (distanceToMax < qDampingWidth && velocity > 0.0) {
+            dampingTorque = -qDampingGain * velocity;
+        }
+        taud += dampingTorque;
+    }
+
+    // Position protection first only if calibrated
     if (calibrated) {
         if (position <= qMin && taud < 0) {
             taud = 0;

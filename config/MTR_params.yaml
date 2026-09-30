@@ -63,6 +63,13 @@ RobotMTR:
   #   runaway without false-tripping normal impedance commands.
   tauSafetyMax: 6.0  # [N·m at joint] — must be > tauMax
 
+  # ── Joint soft-limit damping ────────────────────────────────────────────────
+  # Applied by JointMT in torque control only. The gain opposes measured motion
+  # toward a stop; hard clipping and RobotMTR's post-calibration safety check
+  # remain active outside this band.
+  qDampingWidth: 10.0   # [deg] before each q limit
+  qDampingGain:  0.5    # [N·m·s/rad] viscous damping toward each stop
+
   # ── Per-joint drive parameters ────────────────────────────────────────────────
   # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.
   #   Rated current = 0.319 N·m / 0.114 N·m/A = 2.795 A (nameplate).

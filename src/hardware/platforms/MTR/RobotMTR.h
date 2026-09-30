@@ -150,6 +150,8 @@ class RobotMTR : public Robot {
     double dqMax        = 200.0 * M_PI / 180.0;  //!< Max JOINT speed  [rad/s] (200 deg/s joint = 3000 deg/s motor)
     double tauMax       =   3.0;                  //!< Max JOINT torque [N·m]   (3.0 N·m joint = 0.2 N·m motor)
     double tauSafetyMax =   6.0;                  //!< Measured-torque e-stop [N·m joint]; must be > tauMax
+    double qDampingWidth = 10.0 * M_PI / 180.0;   //!< Soft-limit damping band [rad]
+    double qDampingGain  = 0.5;                   //!< Soft-limit viscous gain [N·m·s/rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)

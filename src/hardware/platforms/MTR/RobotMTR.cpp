@@ -39,7 +39,8 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              -dqMax, dqMax,
                              -tauMax, tauMax,
                              iPeak, kt,
-                             new CopleyDrive(node), jname));
+                             new CopleyDrive(node), jname,
+                             qDampingWidth, qDampingGain));
     }
 
     addInput(keyboard = new Keyboard());
@@ -98,6 +99,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (p["dqMax"])       dqMax       = min(max(0., p["dqMax"].as<double>()), 3600.) * M_PI / 180.;
     if (p["tauMax"])      tauMax      = min(max(0., p["tauMax"].as<double>()), 80.);
     if (p["tauSafetyMax"]) tauSafetyMax = max(tauMax, p["tauSafetyMax"].as<double>());
+    if (p["qDampingWidth"]) qDampingWidth = max(0., p["qDampingWidth"].as<double>()) * M_PI / 180.;
+    if (p["qDampingGain"])  qDampingGain  = max(0., p["qDampingGain"].as<double>());
 
     // Safety envelope
     if (p["maxEndEffForce"]) maxEndEffForce = max(0., p["maxEndEffForce"].as<double>());
