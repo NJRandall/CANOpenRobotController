@@ -101,7 +101,7 @@ struct MTRCollisionHitboxes {
 
 class RobotMTR : public Robot {
    public:
-    // Original two-arg constructor retained for backward compatibility
+    // With no explicit node list, drive_node_ids are loaded from YAML.
     RobotMTR(const std::string &robot_name      = "RobotMTR",
              const std::string &yaml_config_file = "");
 
@@ -207,6 +207,7 @@ class RobotMTR : public Robot {
     double singularityDampingGain          = 0.5;                 //!< Singularity viscous gain [N·m·s/rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
+    std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)
     std::vector<double> motorCstt    = {0.114, 0.114};  //!< Maxon EC60 torque constant Kt [N·m/A]
     std::vector<double> qSigns       = {-1.0,   1.0};   //!< Sign correction (VERIFIED from spin tests)

@@ -9,7 +9,8 @@
 #   Joint limits sourced from System Modelling/ROM (1).m and accelCalc (1).m.
 #
 #   To load this file, construct RobotMTR with:
-#       RobotMTR("RobotMTR", "MTR_params.yaml")
+#       RobotMTR("Robot0", "MTR_params.yaml")
+#   Robot0 and Robot1 use separate sections in this shared file.
 #
 #   Parameter status legend:
 #     VERIFIED   — confirmed against hardware or datasheet
@@ -27,7 +28,9 @@
 #   θ₂ ∈ [−150°, −20°]  measured from the +X axis (world frame, at shoulder — parallel linkage)
 #
 
-RobotMTR:
+Robot0:
+
+  drive_node_ids: [1, 3]  # Joint 0, Joint 1 CAN node IDs
 
   # ── Geometry ─────────────────────────────────────────────────────────────────
   # Status: MUST VERIFY — measure physical links before enabling forward kinematics.
@@ -141,3 +144,44 @@ RobotMTR:
   #   (~5 N max from joint torque via Jᵀ), so this cap is a backstop against calculation errors.
   #   Review before clinical use with patients.
   maxEndEffForce: 20.0        # Max end-effector contact force (XY) [N]
+
+Robot1:
+  # Robot 1 currently shares the same hardware and control values as Robot 0.
+  # Its workspace pose will be supplied independently once IMU integration is added.
+  drive_node_ids: [2, 4]  # Joint 0, Joint 1 CAN node IDs
+  L1: 0.43
+  L2: 0.37
+  parallel_ratio: 1.0
+
+  dqMax: 200
+  tauMax: 3.0
+  tauSafetyMax: 6.0
+  qDampingWidth: 10.0
+  qDampingGain: 0.5
+  singularityDampingAngleExtended: 15.0
+  singularityDampingAngleFolded: 15.0
+  singularityDampingGain: 0.5
+
+  collision:
+    base_x: 0.0
+    base_y: 0.0
+    base_yaw: 0.0
+    link_thickness: 0.08
+    boundary: 0.02
+    link_A_length: 0.20
+    joint_radius: 0.02
+    frame:
+      center_x: 0.0
+      center_y: 0.0
+      width: 0.60
+      height: 0.40
+      boundary: 0.02
+
+  iPeakDrives: [2.795, 2.795]
+  motorCstt: [0.114, 0.114]
+  qSigns: [1, 1]
+  qLimits: [-360, 360, -360, 360]
+  qCalibration: [0, 0]
+  frictionVis: [0.33, 0.76]
+  frictionCoul: [0.35, 0.19]
+  maxEndEffForce: 20.0

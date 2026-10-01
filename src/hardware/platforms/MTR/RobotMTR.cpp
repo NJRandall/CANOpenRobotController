@@ -23,10 +23,13 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
 
-    // Construct one JointMT per provided drive node id. Indexing into parameter
-    // vectors uses element i for each single-joint robot.
-    for (size_t i = 0; i < drive_node_ids.size(); ++i) {
-        int node = drive_node_ids[i];
+    // Explicit constructor arguments override YAML; an empty list selects the
+    // node list loaded for this robot from the shared parameter file.
+    std::vector<int> configuredDriveNodeIds = drive_node_ids.empty()
+                                            ? driveNodeIds
+                                            : drive_node_ids;
+    for (size_t i = 0; i < configuredDriveNodeIds.size(); ++i) {
+        int node = configuredDriveNodeIds[i];
         double qmin = qLimits.size() > 2*i ? qLimits[2*i] : qLimits[0];
         double qmax = qLimits.size() > 2*i+1 ? qLimits[2*i+1] : qLimits[1];
         double iPeak = iPeakDrives.size() > i ? iPeakDrives[i] : iPeakDrives[0];
@@ -58,7 +61,7 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
 
 // Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
-    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {}
+    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{}) {}
 
 RobotMTR::~RobotMTR() {
     for (auto p : joints) delete p;
@@ -94,6 +97,12 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (p["L1"])             L1             = p["L1"].as<double>();
     if (p["L2"])             L2             = p["L2"].as<double>();
     if (p["parallel_ratio"]) parallel_ratio = p["parallel_ratio"].as<double>();
+
+    if (p["drive_node_ids"] && p["drive_node_ids"].size() > 0) {
+        driveNodeIds.clear();
+        for (unsigned int i = 0; i < p["drive_node_ids"].size(); ++i)
+            driveNodeIds.push_back(p["drive_node_ids"][i].as<int>());
+    }
 
     // Drive envelope (hard-constrained for safety)
     if (p["dqMax"])       dqMax       = min(max(0., p["dqMax"].as<double>()), 3600.) * M_PI / 180.;
