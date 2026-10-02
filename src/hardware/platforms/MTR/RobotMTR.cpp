@@ -23,10 +23,13 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
 
-    // Construct one JointMT per provided drive node id. Indexing into parameter
-    // vectors uses element i for each single-joint robot.
-    for (size_t i = 0; i < drive_node_ids.size(); ++i) {
-        int node = drive_node_ids[i];
+    // Explicit constructor arguments override YAML; an empty list selects the
+    // node list loaded for this robot from the shared parameter file.
+    std::vector<int> configuredDriveNodeIds = drive_node_ids.empty()
+                                            ? driveNodeIds
+                                            : drive_node_ids;
+    for (size_t i = 0; i < configuredDriveNodeIds.size(); ++i) {
+        int node = configuredDriveNodeIds[i];
         double qmin = qLimits.size() > 2*i ? qLimits[2*i] : qLimits[0];
         double qmax = qLimits.size() > 2*i+1 ? qLimits[2*i+1] : qLimits[1];
         double iPeak = iPeakDrives.size() > i ? iPeakDrives[i] : iPeakDrives[0];
@@ -39,7 +42,8 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              -dqMax, dqMax,
                              -tauMax, tauMax,
                              iPeak, kt,
-                             new CopleyDrive(node), jname));
+                             new CopleyDrive(node), jname,
+                             qDampingWidth, qDampingGain));
     }
 
     addInput(keyboard = new Keyboard());
@@ -57,7 +61,7 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
 
 // Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file)
-    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{1,3}) {}
+    : RobotMTR(robot_name, yaml_config_file, std::vector<int>{}) {}
 
 RobotMTR::~RobotMTR() {
     for (auto p : joints) delete p;
@@ -94,10 +98,53 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (p["L2"])             L2             = p["L2"].as<double>();
     if (p["parallel_ratio"]) parallel_ratio = p["parallel_ratio"].as<double>();
 
+    if (p["drive_node_ids"] && p["drive_node_ids"].size() > 0) {
+        driveNodeIds.clear();
+        for (unsigned int i = 0; i < p["drive_node_ids"].size(); ++i)
+            driveNodeIds.push_back(p["drive_node_ids"][i].as<int>());
+    }
+
     // Drive envelope (hard-constrained for safety)
     if (p["dqMax"])       dqMax       = min(max(0., p["dqMax"].as<double>()), 3600.) * M_PI / 180.;
     if (p["tauMax"])      tauMax      = min(max(0., p["tauMax"].as<double>()), 80.);
     if (p["tauSafetyMax"]) tauSafetyMax = max(tauMax, p["tauSafetyMax"].as<double>());
+    if (p["qDampingWidth"]) qDampingWidth = max(0., p["qDampingWidth"].as<double>()) * M_PI / 180.;
+    if (p["qDampingGain"])  qDampingGain  = max(0., p["qDampingGain"].as<double>());
+    if (p["singularityDampingAngleExtended"])
+        singularityDampingAngleExtended = max(0., p["singularityDampingAngleExtended"].as<double>()) * M_PI / 180.;
+    if (p["singularityDampingAngleFolded"])
+        singularityDampingAngleFolded = max(0., p["singularityDampingAngleFolded"].as<double>()) * M_PI / 180.;
+    if (p["singularityDampingGain"])
+        singularityDampingGain = max(0., p["singularityDampingGain"].as<double>());
+
+    YAML::Node collision = p["collision"];
+    if (collision) {
+        if (collision["base_x"]) collisionBaseX = collision["base_x"].as<double>();
+        if (collision["base_y"]) collisionBaseY = collision["base_y"].as<double>();
+        if (collision["base_yaw"])
+            collisionBaseYaw = collision["base_yaw"].as<double>() * M_PI / 180.;
+        if (collision["link_thickness"])
+            collisionLinkThickness = max(0., collision["link_thickness"].as<double>());
+        if (collision["boundary"])
+            collisionBoundary = max(0., collision["boundary"].as<double>());
+        if (collision["link_A_length"])
+            collisionLinkALength = max(0., collision["link_A_length"].as<double>());
+        if (collision["joint_radius"])
+            collisionJointRadius = max(0., collision["joint_radius"].as<double>());
+        YAML::Node frame = collision["frame"];
+        if (frame) {
+            if (frame["center_x"])
+                collisionFrameCenterX = frame["center_x"].as<double>();
+            if (frame["center_y"])
+                collisionFrameCenterY = frame["center_y"].as<double>();
+            if (frame["width"])
+                collisionFrameWidth = max(0., frame["width"].as<double>());
+            if (frame["height"])
+                collisionFrameHeight = max(0., frame["height"].as<double>());
+            if (frame["boundary"])
+                collisionFrameBoundary = max(0., frame["boundary"].as<double>());
+        }
+    }
 
     // Safety envelope
     if (p["maxEndEffForce"]) maxEndEffForce = max(0., p["maxEndEffForce"].as<double>());
@@ -278,6 +325,47 @@ VM2 RobotMTR::calculateGravityTorques() {
     return VM2::Zero();
 }
 
+MTRCollisionHitboxes RobotMTR::getCollisionHitboxes() const {
+    bool two = joints.size() > 1;
+    VM2 q(joints[0]->getPosition(), two ? joints[1]->getPosition() : 0.0);
+    return getCollisionHitboxes(q);
+}
+
+MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
+    double c = std::cos(collisionBaseYaw);
+    double s = std::sin(collisionBaseYaw);
+    auto toWorkspace = [this, c, s](VM2 localPoint) {
+        return VM2(c * localPoint[0] - s * localPoint[1] + collisionBaseX,
+                   s * localPoint[0] + c * localPoint[1] + collisionBaseY);
+    };
+
+    // q is expressed relative to this robot's base. The primary chain is
+    // origin -> L1 -> L2, while the parallel chain is origin -> A -> B.
+    // A follows q2 and B follows q1, with B having the same length as L1.
+    VM2 origin = VM2::Zero();
+    VM2 endL1 = VM2(L1 * std::cos(q[0]), L1 * std::sin(q[0]));
+    VM2 endL2 = endL1 + VM2(L2 * std::cos(q[1]), L2 * std::sin(q[1]));
+    VM2 endA = VM2(collisionLinkALength * std::cos(q[1]),
+                   collisionLinkALength * std::sin(q[1]));
+    VM2 endB = endA + VM2(L1 * std::cos(q[0]), L1 * std::sin(q[0]));
+    VM2 frameCenterLocal(collisionFrameCenterX, collisionFrameCenterY);
+
+    double radius = 0.5 * collisionLinkThickness;
+    return MTRCollisionHitboxes{
+        {toWorkspace(origin), toWorkspace(endL1), radius, collisionBoundary},
+        {toWorkspace(endL1), toWorkspace(endL2), radius, collisionBoundary},
+        {toWorkspace(origin), toWorkspace(endA), radius, collisionBoundary},
+        {toWorkspace(endA), toWorkspace(endB), radius, collisionBoundary},
+        {toWorkspace(origin), collisionJointRadius, collisionBoundary},
+        {toWorkspace(endL1), collisionJointRadius, collisionBoundary},
+        {toWorkspace(endA), collisionJointRadius, collisionBoundary},
+        {toWorkspace(frameCenterLocal),
+         VM2(0.5 * collisionFrameWidth, 0.5 * collisionFrameHeight),
+         collisionBaseYaw,
+         collisionFrameBoundary}
+    };
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Robot update (called every control cycle)
@@ -361,6 +449,11 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 setMovementReturnCode_t RobotMTR::setJointTorque(VM2 tau) {
+    if (joints.size() > 1) {
+        VM2 q(joints[0]->getPosition(), joints[1]->getPosition());
+        VM2 dq(joints[0]->getVelocity(), joints[1]->getVelocity());
+        tau += singularityDampingTorque(q, dq);
+    }
     return applyTorque({tau[0], tau[1]});
 }
 
@@ -370,6 +463,53 @@ setMovementReturnCode_t RobotMTR::setJointPosition(VM2 q) {
 
 setMovementReturnCode_t RobotMTR::setJointVelocity(VM2 dq) {
     return applyVelocity({dq[0], dq[1]});
+}
+
+VM2 RobotMTR::singularityDampingTorque(VM2 q, VM2 dq) const {
+    if (singularityDampingGain <= 0.0)
+        return VM2::Zero();
+
+    // The link alignment is determined by the relative angle q2 - q1.
+    // Zero is fully extended; +/- pi is fully folded.
+    double delta = q[1] - q[0];
+
+    // Wrap the relative angle so equivalent configurations use one common range.
+    double wrappedDelta = std::atan2(std::sin(delta), std::cos(delta));
+
+    // Select the nearer singularity branch: zero for extended, +/- pi for folded.
+    bool approachingExtended = std::abs(wrappedDelta) <= M_PI / 2.0;
+
+    // Measure the shortest angular distance to the selected singularity.
+    double distance = approachingExtended
+                    ? std::abs(wrappedDelta)
+                    : M_PI - std::abs(wrappedDelta);
+
+    // Extended and folded configurations can use different activation bands.
+    double dampingAngle = approachingExtended
+                        ? singularityDampingAngleExtended
+                        : singularityDampingAngleFolded;
+
+    // Outside the band there is no damping; the exact singularity is left to
+    // the mechanical stop rather than creating a direction ambiguity here.
+    if (dampingAngle <= 0.0 || distance >= dampingAngle || distance < 1e-9)
+        return VM2::Zero();
+
+    // This gradient points toward increasing distance from the selected singularity.
+    double direction = wrappedDelta < 0.0 ? -1.0 : 1.0;
+    VM2 gradient = approachingExtended
+                 ? VM2(-direction, direction)
+                 : VM2(direction, -direction);
+
+    // A negative rate means the measured joint motion is approaching the singularity.
+    double distanceRate = gradient.dot(dq);
+    if (distanceRate >= 0.0)
+        return VM2::Zero();
+
+    // Ramp damping smoothly from zero at the band edge to full gain at the stop.
+    double activation = 1.0 - distance / dampingAngle;
+
+    // Viscous damping opposes approach velocity; it does not create a spring force.
+    return -singularityDampingGain * activation * distanceRate * gradient;
 }
 
 

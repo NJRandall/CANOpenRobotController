@@ -9,7 +9,8 @@
 #   Joint limits sourced from System Modelling/ROM (1).m and accelCalc (1).m.
 #
 #   To load this file, construct RobotMTR with:
-#       RobotMTR("RobotMTR", "MTR_params.yaml")
+#       RobotMTR("Robot0", "MTR_params.yaml")
+#   Robot0 and Robot1 use separate sections in this shared file.
 #
 #   Parameter status legend:
 #     VERIFIED   — confirmed against hardware or datasheet
@@ -27,7 +28,9 @@
 #   θ₂ ∈ [−150°, −20°]  measured from the +X axis (world frame, at shoulder — parallel linkage)
 #
 
-RobotMTR:
+Robot0:
+
+  drive_node_ids: [1, 3]  # Joint 0, Joint 1 CAN node IDs
 
   # ── Geometry ─────────────────────────────────────────────────────────────────
   # Status: MUST VERIFY — measure physical links before enabling forward kinematics.
@@ -62,6 +65,36 @@ RobotMTR:
   #   Must be strictly > tauMax. 6.0 = 2 × tauMax = 0.4 N·m motor — catches genuine
   #   runaway without false-tripping normal impedance commands.
   tauSafetyMax: 6.0  # [N·m at joint] — must be > tauMax
+
+  # ── Joint soft-limit damping ────────────────────────────────────────────────
+  # Applied by JointMT in torque control only. The gain opposes measured motion
+  # toward a stop; hard clipping and RobotMTR's post-calibration safety check
+  # remain active outside this band.
+  qDampingWidth: 10.0   # [deg] before each q limit
+  qDampingGain:  0.5    # [N·m·s/rad] viscous damping toward each stop
+
+  # ── Robot-level singularity damping ─────────────────────────────────────────
+  # Applies near both fully-extended and fully-folded configurations.
+  singularityDampingAngleExtended: 15.0  # [deg] from fully extended
+  singularityDampingAngleFolded:   15.0  # [deg] from fully folded
+  singularityDampingGain:            0.5 # [N·m·s/rad] damping opposing approach
+
+  # ── Shared-workspace collision geometry ─────────────────────────────────────
+  # The base pose is the shoulder position and orientation in the shared frame.
+  collision:
+    base_x: 0.0             # [m] initial/fallback workspace x position
+    base_y: 0.0             # [m] initial/fallback workspace y position
+    base_yaw: 0.0           # [deg] initial/fallback yaw; replace with IMU at runtime later
+    link_thickness: 0.08    # [m] physical link diameter
+    boundary: 0.02          # [m] extra clearance around each link
+    link_A_length: 0.20     # [m] MUST VERIFY; shorter parallel link
+    joint_radius: 0.02      # [m] physical radius around link joints
+    frame:
+      center_x: 0.0         # [m] frame centre relative to robot base
+      center_y: 0.0         # [m] frame centre relative to robot base
+      width: 0.60           # [m]
+      height: 0.40          # [m]
+      boundary: 0.02        # [m] extra clearance around the frame
 
   # ── Per-joint drive parameters ────────────────────────────────────────────────
   # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.
@@ -110,3 +143,44 @@ RobotMTR:
   #   (~5 N max from joint torque via Jᵀ), so this cap is a backstop against calculation errors.
   #   Review before clinical use with patients.
   maxEndEffForce: 20.0        # Max end-effector contact force (XY) [N]
+
+Robot1:
+  # Robot 1 currently shares the same hardware and control values as Robot 0.
+  # Its workspace pose will be supplied independently once IMU integration is added.
+  drive_node_ids: [2, 4]  # Joint 0, Joint 1 CAN node IDs
+  L1: 0.43
+  L2: 0.37
+  parallel_ratio: 1.0
+
+  dqMax: 200
+  tauMax: 3.0
+  tauSafetyMax: 6.0
+  qDampingWidth: 10.0
+  qDampingGain: 0.5
+  singularityDampingAngleExtended: 15.0
+  singularityDampingAngleFolded: 15.0
+  singularityDampingGain: 0.5
+
+  collision:
+    base_x: 0.0
+    base_y: 0.0
+    base_yaw: 0.0
+    link_thickness: 0.08
+    boundary: 0.02
+    link_A_length: 0.20
+    joint_radius: 0.02
+    frame:
+      center_x: 0.0
+      center_y: 0.0
+      width: 0.60
+      height: 0.40
+      boundary: 0.02
+
+  iPeakDrives: [2.795, 2.795]
+  motorCstt: [0.114, 0.114]
+  qSigns: [1, 1]
+  qLimits: [-360, 360, -360, 360]
+  qCalibration: [0, 0]
+  frictionVis: [0.33, 0.76]
+  frictionCoul: [0.35, 0.19]
+  maxEndEffForce: 20.0
