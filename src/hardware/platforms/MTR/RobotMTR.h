@@ -210,7 +210,7 @@ class RobotMTR : public Robot {
     std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)
     std::vector<double> motorCstt    = {0.114, 0.114};  //!< Maxon EC60 torque constant Kt [N·m/A]
-    std::vector<double> qSigns       = {-1.0,   1.0};   //!< Sign correction (VERIFIED from spin tests)
+    std::vector<double> qSigns       = {-1.0,   -1.0};   //!< Sign correction (VERIFIED from spin tests)
 
     // Friction model — zero until system identification; see MTR_params.yaml
     std::vector<double> frictionVis  = {0.0, 0.0};   //!< Viscous  [N·m·s/rad]
@@ -218,16 +218,21 @@ class RobotMTR : public Robot {
 
     // Joint limits [rad] layout: {θ1_min, θ1_max, θ2_min, θ2_max}
     // TODO: LIMITS REMOVED NEED TO BE REINSTATED ONCE HARDWARE VERIFIED — see MTR_params.yaml
+    // Joints are declared as larger link: Joint 0 = θ1_min, θ1_max and smaller link: Joint 1 = θ2_min, θ2_max
+    // Single joint limits are specified as {θ_min, θ_max} for each joint
+
+    //!!!!!!!!! Angles between inaccurate joint 0 at 90 real is 80 in software (TO DO: VERIFY) !!!!!!!!!!!!!!!!!!
+
     std::vector<double> qLimits = {
-        -360.0 * M_PI / 180.0,    360.0 * M_PI / 180.0,   // θ₁ ∈ [−30°, 100°]
-        -360.0 * M_PI / 180.0,    160.0 * M_PI / 180.0    // θ₂ ∈ [−160°, −30°]
+        -12.0 * M_PI / 180.0,    180.0 * M_PI / 180.0,   // θ₁ ∈ [−10+(2 safety)°, 180°]
+        15.0 * M_PI / 180.0,    245.0 * M_PI / 180.0    // θ₂ ∈ [15°, 245°]
     };
 
-    // MUST VERIFY against physical robot — measure true joint angles at each hard stop.
+    // TODO !!!!MUST VERIFY against physical robot — measure true joint angles at each hard stop.
     // Joint 0 stops at θ₁_max; joint 1 stops at θ₂_min (see MTR_params.yaml for procedure).
     VM2 qCalibration = {
-         0.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
-         0.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
+         -10.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
+         140.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
     };
 
     bool calibrated      = false;

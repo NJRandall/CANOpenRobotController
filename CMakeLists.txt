@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
+#set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum CMake policy version" FORCE) #uncomment in case of errors - potential work around for cmake
 project(CORC C CXX)
 
 #To cross-compile for Arm (BeagleBone) use the armhf toolchain:
@@ -23,7 +24,7 @@ include(../MTRobotMachine/app.cmake)
 #include(../myStateMachineApp/app.cmake) ## example only, need to be defined
 
 ## Comment to use actual hardware, uncomment for a nor robot (virtual) app
-#set(NO_ROBOT ON)
+set(NO_ROBOT OFF)
 
 ## Select desired logging level (Options: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, OFF)
 ## INFO is the recommended level in normal operation
@@ -33,3 +34,31 @@ set(CORC_LOGGING_LEVEL DEBUG)
 
 ## CORC internal cmake logic
 include(corc.cmake)
+
+################################################################################
+# Exists only for MTRobotMachine_APP
+# Yaml configuration for MTR_params.yaml hardcoded to find in directory
+
+## LCD1602 background thread requires pthread
+target_link_libraries(${APP_NAME} pthread)
+
+## Copy MTR_params.yaml to build/config/ for cross-compile builds where
+## BASE_DIRECTORY="." and the binary looks for config/ relative to itself.
+## (For native builds BASE_DIRECTORY=CMAKE_SOURCE_DIR and the file is found
+## directly in the source tree at config/MTR_params.yaml.)
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/config/MTR_params.yaml")
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/config")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/config/MTR_params.yaml"
+        "${CMAKE_BINARY_DIR}/config/MTR_params.yaml"
+        COPYONLY
+    )
+endif()
+
+add_custom_command(TARGET ${APP_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:${APP_NAME}>/config"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_LIST_DIR}/config/MTR_params.yaml"
+        "$<TARGET_FILE_DIR:${APP_NAME}>/config/MTR_params.yaml"
+)
