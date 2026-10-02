@@ -22,6 +22,7 @@
  */
 class State {
     friend class StateMachine;
+    friend class MultiStateMachine;
 
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW // Required to use eigen fixed size vectors/objects in states. See first section of http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html.

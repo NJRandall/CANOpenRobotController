@@ -23,8 +23,8 @@
 #                       └─────────────── θ₂  (elbow, Drive 2, CAN ID 3)
 #                                        └── ● Handle (end-effector)
 #
-#   θ₁ ∈ [−30°, 100°]   measured from the +X axis (world frame, at shoulder)
-#   θ₂ ∈ [−160°, −30°]  measured from the +X axis (world frame, at shoulder — parallel linkage)
+#   θ₁ ∈ [−20°, 100°]   measured from the +X axis (world frame, at shoulder)
+#   θ₂ ∈ [−150°, −20°]  measured from the +X axis (world frame, at shoulder — parallel linkage)
 #
 
 RobotMTR:

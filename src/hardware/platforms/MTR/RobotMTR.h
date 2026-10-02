@@ -71,8 +71,14 @@ typedef Eigen::VectorXd VX;    //!< Dynamic-size vector (for FLNLHelper / loggin
 
 class RobotMTR : public Robot {
    public:
+    // Original two-arg constructor retained for backward compatibility
     RobotMTR(const std::string &robot_name      = "RobotMTR",
              const std::string &yaml_config_file = "");
+
+    // Overload allowing explicit drive node ids (single-drive test wrapper uses this)
+    RobotMTR(const std::string &robot_name,
+             const std::string &yaml_config_file,
+             const std::vector<int> &drive_node_ids);
     ~RobotMTR();
 
     Keyboard      *keyboard;  //!< Keyboard input (fallback / development)
