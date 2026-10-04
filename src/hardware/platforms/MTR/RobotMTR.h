@@ -125,6 +125,7 @@ class RobotMTR : public Robot {
     bool initialiseNetwork() override;
     bool initialiseInputs()  override;
     void updateRobot()       override;
+    std::size_t probeDriveNodes() const;
 
     // ── Safety ────────────────────────────────────────────────────────────────
     setMovementReturnCode_t safetyCheck();
@@ -153,7 +154,8 @@ class RobotMTR : public Robot {
     MTRCollisionHitboxes getCollisionHitboxes(VM2 q) const;
 
     // ── Joint-space setters ───────────────────────────────────────────────────
-    setMovementReturnCode_t setJointTorque(VM2 tau);
+    setMovementReturnCode_t setJointTorque(VM2 tau,
+                                            bool applySingularityDamping = true);
     setMovementReturnCode_t setJointPosition(VM2 q);
     setMovementReturnCode_t setJointVelocity(VM2 dq);
 

@@ -1,5 +1,5 @@
-Robot0:
-  drive_node_ids: [1]  # CANopen drive node ID
+v1_unit:
+  drive_node_ids: [1, 3]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
@@ -25,17 +25,17 @@ Robot0:
       width: 0.60  # Frame width [m]
       height: 0.40  # Frame height [m]
       boundary: 0.02  # Frame clearance [m]
-  iPeakDrives: [2.795]  # Drive peak current limit [A]
-  motorCstt: [0.114]  # Motor torque constant [N*m/A]
-  qSigns: [1]  # Joint direction sign correction
-  qLimits: [-360, 360]  # Joint minimum and maximum angles [deg]
-  qCalibration: [0]  # Calibration reference angle [deg]
-  frictionVis: [0.33]  # Viscous friction coefficient [N*m*s/rad]
-  frictionCoul: [0.35]  # Coulomb friction coefficient [N*m]
+  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
+  motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
+  qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
+  qLimits: [-360, 360, -360, 360]  # Joint 0 and joint 1 angle limits [deg]
+  qCalibration: [0, 0]  # Joint 0 and joint 1 calibration angles [deg]
+  frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
+  frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
 
-Robot1:
-  drive_node_ids: [3]  # CANopen drive node ID
+v2_unit:
+  drive_node_ids: [2, 4]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
@@ -61,11 +61,11 @@ Robot1:
       width: 0.60  # Frame width [m]
       height: 0.40  # Frame height [m]
       boundary: 0.02  # Frame clearance [m]
-  iPeakDrives: [2.795]  # Drive peak current limit [A]
-  motorCstt: [0.114]  # Motor torque constant [N*m/A]
-  qSigns: [1]  # Joint direction sign correction
-  qLimits: [-360, 360]  # Joint minimum and maximum angles [deg]
-  qCalibration: [0]  # Calibration reference angle [deg]
-  frictionVis: [0.76]  # Viscous friction coefficient [N*m*s/rad]
-  frictionCoul: [0.19]  # Coulomb friction coefficient [N*m]
+  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
+  motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
+  qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
+  qLimits: [-360, 360, -360, 360]  # Joint 0 and joint 1 angle limits [deg]
+  qCalibration: [0, 0]  # Joint 0 and joint 1 calibration angles [deg]
+  frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
+  frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]

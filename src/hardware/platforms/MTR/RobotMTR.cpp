@@ -222,6 +222,15 @@ bool RobotMTR::initialiseInputs() {
     return true;   // encoder is registered via addInput() in constructor
 }
 
+std::size_t RobotMTR::probeDriveNodes() const {
+    std::size_t responsiveNodes = 0;
+    for (const Joint *joint : joints) {
+        if (joint->drive && joint->drive->SDORead())
+            ++responsiveNodes;
+    }
+    return responsiveNodes;
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Drive mode initialisation (same pattern as RobotM3)
@@ -448,8 +457,9 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
 // Joint-space setters
 // ═══════════════════════════════════════════════════════════════════════════════
 
-setMovementReturnCode_t RobotMTR::setJointTorque(VM2 tau) {
-    if (joints.size() > 1) {
+setMovementReturnCode_t RobotMTR::setJointTorque(VM2 tau,
+                                                  bool applySingularityDamping) {
+    if (applySingularityDamping && joints.size() > 1) {
         VM2 q(joints[0]->getPosition(), joints[1]->getPosition());
         VM2 dq(joints[0]->getVelocity(), joints[1]->getVelocity());
         tau += singularityDampingTorque(q, dq);
