@@ -13,7 +13,7 @@ class RobotMTRSingle : public RobotMTR {
    public:
     RobotMTRSingle(const std::string &robot_name = "RobotMTRSingle",
                    const std::string &yaml_config_file = "",
-                   std::vector<int> drive_node_ids = {})
+                   std::vector<int> drive_node_ids = {1})
         : RobotMTR(robot_name, yaml_config_file, drive_node_ids) {}
 
     ~RobotMTRSingle() {}
