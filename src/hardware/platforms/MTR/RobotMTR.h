@@ -139,6 +139,12 @@ class RobotMTR : public Robot {
     bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
     const VM2 &calibrationDirection() const { return calibrationDirection_; }
     const VM2 &calibrationTorque() const { return calibrationTorque_; }
+    bool collisionAvoidanceEnabled() const { return collisionAvoidanceEnabled_; }
+    double collisionPredictionHorizon() const { return collisionPredictionHorizon_; }
+    double collisionInfluenceDistance() const { return collisionInfluenceDistance_; }
+    double collisionSpringGain() const { return collisionSpringGain_; }
+    double collisionDecayLength() const { return collisionDecayLength_; }
+    double collisionDampingGain() const { return collisionDampingGain_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -155,6 +161,9 @@ class RobotMTR : public Robot {
 
     /** Build the four link hitboxes for a supplied joint configuration. */
     MTRCollisionHitboxes getCollisionHitboxes(VM2 q) const;
+    VM2 collisionPointVelocity(std::size_t linkIndex, double fraction) const;
+    VM2 collisionPointJointTorque(std::size_t linkIndex, double fraction,
+                                  const VM2 &force) const;
 
     // ── Joint-space setters ───────────────────────────────────────────────────
     setMovementReturnCode_t setJointTorque(VM2 tau,
@@ -166,6 +175,8 @@ class RobotMTR : public Robot {
     /** τ = Jᵀ·F + τ_friction  (no gravity term — horizontal plane). */
     setMovementReturnCode_t setEndEffForceWithCompensation(VM2 F,
                                                            bool friction_comp = true);
+    setMovementReturnCode_t setEndEffForceWithCompensation(
+        VM2 F, bool friction_comp, const VM2 &collisionPriorityTorque);
 
     // ── State readers (VX for FLNLHelper / CSV logging) ──────────────────────
     const VX &getEndEffPosition();
@@ -236,6 +247,12 @@ class RobotMTR : public Robot {
     };
 
         bool automaticCalibrationEnabled_ = false;
+        bool collisionAvoidanceEnabled_ = false;
+        double collisionPredictionHorizon_ = 0.15;
+        double collisionInfluenceDistance_ = 0.15;
+        double collisionSpringGain_ = 0.25;
+        double collisionDecayLength_ = 0.05;
+        double collisionDampingGain_ = 2.0;
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 

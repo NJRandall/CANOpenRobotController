@@ -95,6 +95,18 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
 
     if (params["auto_calibration"])
         automaticCalibrationEnabled_ = params["auto_calibration"].as<bool>();
+    if (params["collision_avoidance"])
+        collisionAvoidanceEnabled_ = params["collision_avoidance"].as<bool>();
+    if (params["collision_prediction_horizon"])
+        collisionPredictionHorizon_ = max(0., params["collision_prediction_horizon"].as<double>());
+    if (params["collision_influence_distance"])
+        collisionInfluenceDistance_ = max(0., params["collision_influence_distance"].as<double>());
+    if (params["collision_spring_gain"])
+        collisionSpringGain_ = max(0., params["collision_spring_gain"].as<double>());
+    if (params["collision_decay_length"])
+        collisionDecayLength_ = max(1e-6, params["collision_decay_length"].as<double>());
+    if (params["collision_damping_gain"])
+        collisionDampingGain_ = max(0., params["collision_damping_gain"].as<double>());
 
     // Geometry — loaded from YAML so that tuning never requires a recompile
     if (p["L1"])             L1             = p["L1"].as<double>();
@@ -405,6 +417,71 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
     };
 }
 
+VM2 RobotMTR::collisionPointVelocity(std::size_t linkIndex, double fraction) const {
+    if (joints.size() < 2 || linkIndex > 3)
+        return VM2::Zero();
+
+    const double q1 = joints[0]->getPosition();
+    const double q2 = joints[1]->getPosition();
+    const double dq1 = joints[0]->getVelocity();
+    const double dq2 = joints[1]->getVelocity();
+    const VM2 tangent1(-std::sin(q1), std::cos(q1));
+    const VM2 tangent2(-std::sin(q2), std::cos(q2));
+
+    VM2 localVelocity = VM2::Zero();
+    switch (linkIndex) {
+    case 0: localVelocity = fraction * L1 * dq1 * tangent1; break;
+    case 1: localVelocity = L1 * dq1 * tangent1 + fraction * L2 * dq2 * tangent2; break;
+    case 2: localVelocity = fraction * collisionLinkALength * dq2 * tangent2; break;
+    case 3: localVelocity = fraction * L1 * dq1 * tangent1 +
+                             collisionLinkALength * dq2 * tangent2; break;
+    }
+
+    const double cosine = std::cos(collisionBaseYaw);
+    const double sine = std::sin(collisionBaseYaw);
+    return VM2(cosine * localVelocity.x() - sine * localVelocity.y(),
+               sine * localVelocity.x() + cosine * localVelocity.y());
+}
+
+VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
+                                       const VM2 &force) const {
+    if (joints.size() < 2 || linkIndex > 3)
+        return VM2::Zero();
+
+    const double q1 = joints[0]->getPosition();
+    const double q2 = joints[1]->getPosition();
+    const VM2 tangent1(-std::sin(q1), std::cos(q1));
+    const VM2 tangent2(-std::sin(q2), std::cos(q2));
+    VM2 jacobianColumn1 = VM2::Zero();
+    VM2 jacobianColumn2 = VM2::Zero();
+
+    switch (linkIndex) {
+    case 0:
+        jacobianColumn1 = fraction * L1 * tangent1;
+        break;
+    case 1:
+        jacobianColumn1 = L1 * tangent1;
+        jacobianColumn2 = fraction * L2 * tangent2;
+        break;
+    case 2:
+        jacobianColumn2 = fraction * collisionLinkALength * tangent2;
+        break;
+    case 3:
+        jacobianColumn1 = fraction * L1 * tangent1;
+        jacobianColumn2 = collisionLinkALength * tangent2;
+        break;
+    }
+
+    const double cosine = std::cos(collisionBaseYaw);
+    const double sine = std::sin(collisionBaseYaw);
+    auto rotate = [cosine, sine](const VM2 &vector) {
+        return VM2(cosine * vector.x() - sine * vector.y(),
+                   sine * vector.x() + cosine * vector.y());
+    };
+    return VM2(rotate(jacobianColumn1).dot(force),
+               rotate(jacobianColumn2).dot(force));
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Robot update (called every control cycle)
@@ -567,6 +644,12 @@ VM2 RobotMTR::singularityDampingTorque(VM2 q, VM2 dq) const {
 //   4. Clamp each joint torque to ±tauMax.
 setMovementReturnCode_t
 RobotMTR::setEndEffForceWithCompensation(VM2 F, bool friction_comp) {
+    return setEndEffForceWithCompensation(F, friction_comp, VM2::Zero());
+}
+
+setMovementReturnCode_t
+RobotMTR::setEndEffForceWithCompensation(VM2 F, bool friction_comp,
+                                         const VM2 &collisionPriorityTorque) {
     if (!calibrated) return NOT_CALIBRATED;
 
     // ── 1. Cartesian force saturation ─────────────────────────────────────────
@@ -590,16 +673,28 @@ RobotMTR::setEndEffForceWithCompensation(VM2 F, bool friction_comp) {
         }
     }
 
-    // ── 4. Joint torque saturation ────────────────────────────────────────────
-    for (unsigned int i = 0; i < joints.size() && i < 2; i++) {
-        if (std::abs(tau(i)) > tauMax) {
-            spdlog::warn("MTR: Joint {} torque saturated from {:.2f} to ±{:.2f} N·m.",
-                         i, tau(i), tauMax);
-            tau(i) = std::max(-tauMax, std::min(tauMax, tau(i)));
-        }
+    if (joints.size() > 1) {
+        VM2 q(joints[0]->getPosition(), joints[1]->getPosition());
+        VM2 dq(joints[0]->getVelocity(), joints[1]->getVelocity());
+        tau += singularityDampingTorque(q, dq);
     }
 
-    return setJointTorque(tau);
+    // Reserve torque authority for collision repulsion and keep the total
+    // command in the same direction as that repulsion on each joint.
+    for (unsigned int i = 0; i < joints.size() && i < 2; i++) {
+        const double collisionTorque = std::clamp(collisionPriorityTorque(i),
+                                                   -tauMax, tauMax);
+        if (collisionTorque > 0.0)
+            tau(i) = collisionTorque +
+                     std::clamp(tau(i), -collisionTorque, tauMax - collisionTorque);
+        else if (collisionTorque < 0.0)
+            tau(i) = collisionTorque +
+                     std::clamp(tau(i), -tauMax - collisionTorque, -collisionTorque);
+        else
+            tau(i) = std::clamp(tau(i), -tauMax, tauMax);
+    }
+
+    return applyTorque({tau[0], tau[1]});
 }
 
 
@@ -627,7 +722,6 @@ setMovementReturnCode_t RobotMTR::applyTorque(vector<double> torques) {
 }
 
 setMovementReturnCode_t RobotMTR::applyPosition(vector<double> positions) {
-    if (!calibrated) return NOT_CALIBRATED;
     int i = 0;
     setMovementReturnCode_t ret = SUCCESS;
     for (auto p : joints) {

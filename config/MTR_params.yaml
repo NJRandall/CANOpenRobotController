@@ -1,4 +1,10 @@
 auto_calibration: false  # true=automatic drive-to-stop; false=manual calibration
+collision_avoidance: false  # true=enable predictive spring-damper; false=disabled during validation
+collision_prediction_horizon: 0.15  # Constant-velocity prediction horizon [s]
+collision_influence_distance: 0.15  # Begin repulsion at this clearance [m]
+collision_spring_gain: 0.25  # Exponential spring gain [N]
+collision_decay_length: 0.05  # Exponential spring length scale [m]
+collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
 
 v1_unit:
   drive_node_ids: [1, 3]  # Joint 0 and joint 1 CANopen node IDs
