@@ -1,187 +1,71 @@
-#   MTRobot parameter file
-#
-#   2-DOF parallel-linkage tabletop therapy robot.
-#   This file is the canonical source — it lives outside the CORC submodule.
-#   CMakeLists.txt copies it to build/config/ at configure time so that
-#   Robot::initialiseFromYAML() can find it during NO_ROBOT development builds.
-#
-#   Arm geometry sourced from System Modelling/torquecalc (1).m.
-#   Joint limits sourced from System Modelling/ROM (1).m and accelCalc (1).m.
-#
-#   To load this file, construct RobotMTR with:
-#       RobotMTR("Robot0", "MTR_params.yaml")
-#   Robot0 and Robot1 use separate sections in this shared file.
-#
-#   Parameter status legend:
-#     VERIFIED   — confirmed against hardware or datasheet
-#     ESTIMATE   — reasonable guess; replace after system identification
-#     MUST VERIFY — MUST be measured on physical robot before use
-#
-#   Diagram (top view, horizontal plane)
-#
-#   Origin (shoulder)
-#       ●──────────────● θ₁  (proximal joint, Drive 1, CAN ID 1)
-#                       └─────────────── θ₂  (elbow, Drive 2, CAN ID 3)
-#                                        └── ● Handle (end-effector)
-#
-#   θ₁ ∈ [−20°, 100°]   measured from the +X axis (world frame, at shoulder)
-#   θ₂ ∈ [−150°, −20°]  measured from the +X axis (world frame, at shoulder — parallel linkage)
-#
-
 Robot0:
-
-  drive_node_ids: [1, 3]  # Joint 0, Joint 1 CAN node IDs
-
-  # ── Geometry ─────────────────────────────────────────────────────────────────
-  # Status: MUST VERIFY — measure physical links before enabling forward kinematics.
-  # Source: System Modelling/torquecalc (1).m
-  L1: 0.43          # Proximal link length [m]  (shoulder → elbow pivot)
-  L2: 0.37          # Distal   link length [m]  (elbow pivot → handle)
-
-  # Not used in FK or Jacobian — θ₂ is the absolute world-frame angle of link 2
-  # (parallel linkage; link 2 angle is independent of link 1 rotation).
-  parallel_ratio: 1.0
-
-  # ── Drive envelope ────────────────────────────────────────────────────────────
-  # dqMax — JOINT velocity safety limit [deg/s at the joint output shaft].
-  #   JointMT divides drive velocity by reductionRatio=15, so 200 deg/s at the joint
-  #   = 3000 deg/s (500 rpm) at the motor — well within Maxon EC60 rated speed.
-  #   Only enforced when NOT calibrated (pre-calibration safety check).
-  #   After calibration the end-effector velocity limit (2.0 m/s, hardcoded) is active.
-  dqMax:  200        # [deg/s at joint]
-
-  # tauMax — JOINT torque command cap [N·m at the joint output shaft].
-  #   JointMT applies reductionRatio=15, so ALL torque values here are joint torques:
-  #     Motor rated torque:    0.319 N·m  (nameplate — VERIFIED via 0x6076 readback)
-  #     Joint rated torque:    0.319 × 15 = 4.785 N·m
-  #   Current value 3.0 N·m joint = 0.2 N·m motor = 63% motor rated — safe for testing.
-  #   Can raise toward 4.785 N·m joint (= 0.319 N·m motor rated) for more force;
-  #   do not exceed 4.785 N·m joint in sustained therapy (overheats motor above that).
-  #   Applied in JointMT::setTorque() and setEndEffForceWithCompensation() (saturation).
-  tauMax:  3.0       # [N·m at joint]
-
-  # tauSafetyMax — measured JOINT torque emergency-stop threshold [N·m at joint].
-  #   Applied ONLY after calibration (so wake-and-wiggle phasing current never trips it).
-  #   Must be strictly > tauMax. 6.0 = 2 × tauMax = 0.4 N·m motor — catches genuine
-  #   runaway without false-tripping normal impedance commands.
-  tauSafetyMax: 6.0  # [N·m at joint] — must be > tauMax
-
-  # ── Joint soft-limit damping ────────────────────────────────────────────────
-  # Applied by JointMT in torque control only. The gain opposes measured motion
-  # toward a stop; hard clipping and RobotMTR's post-calibration safety check
-  # remain active outside this band.
-  qDampingWidth: 10.0   # [deg] before each q limit
-  qDampingGain:  0.5    # [N·m·s/rad] viscous damping toward each stop
-
-  # ── Robot-level singularity damping ─────────────────────────────────────────
-  # Applies near both fully-extended and fully-folded configurations.
-  singularityDampingAngleExtended: 15.0  # [deg] from fully extended
-  singularityDampingAngleFolded:   15.0  # [deg] from fully folded
-  singularityDampingGain:            0.5 # [N·m·s/rad] damping opposing approach
-
-  # ── Shared-workspace collision geometry ─────────────────────────────────────
-  # The base pose is the shoulder position and orientation in the shared frame.
+  drive_node_ids: [1]  # CANopen drive node ID
+  L1: 0.43  # Proximal link length [m]
+  L2: 0.37  # Distal link length [m]
+  parallel_ratio: 1.0  # Parallel linkage ratio
+  dqMax: 200  # Maximum joint speed [deg/s]
+  tauMax: 3.0  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 6.0  # Measured joint torque stop threshold [N*m]
+  qDampingWidth: 10.0  # Soft-limit damping band [deg]
+  qDampingGain: 0.5  # Soft-limit damping gain [N*m*s/rad]
+  singularityDampingAngleExtended: 15.0  # Extended singularity damping range [deg]
+  singularityDampingAngleFolded: 15.0  # Folded singularity damping range [deg]
+  singularityDampingGain: 0.5  # Singularity damping gain [N*m*s/rad]
   collision:
-    base_x: 0.0             # [m] initial/fallback workspace x position
-    base_y: 0.0             # [m] initial/fallback workspace y position
-    base_yaw: 0.0           # [deg] initial/fallback yaw; replace with IMU at runtime later
-    link_thickness: 0.08    # [m] physical link diameter
-    boundary: 0.02          # [m] extra clearance around each link
-    link_A_length: 0.20     # [m] MUST VERIFY; shorter parallel link
-    joint_radius: 0.02      # [m] physical radius around link joints
+    base_x: 0.0  # Robot base x position in shared frame [m]
+    base_y: 0.0  # Robot base y position in shared frame [m]
+    base_yaw: 0.0  # Robot base rotation in shared frame [deg]
+    link_thickness: 0.08  # Link diameter [m]
+    boundary: 0.02  # Link clearance [m]
+    link_A_length: 0.20  # Short parallel-link length [m]
+    joint_radius: 0.02  # Joint collision radius [m]
     frame:
-      center_x: 0.0         # [m] frame centre relative to robot base
-      center_y: 0.0         # [m] frame centre relative to robot base
-      width: 0.60           # [m]
-      height: 0.40          # [m]
-      boundary: 0.02        # [m] extra clearance around the frame
-
-  # ── Per-joint drive parameters ────────────────────────────────────────────────
-  # Status: VERIFIED — 0x6076 (Motor Rated Torque) = 319 mN·m confirmed on hardware.
-  #   Rated current = 0.319 N·m / 0.114 N·m/A = 2.795 A (nameplate).
-  #   NOTE: 6.0 A is the Copley ACK-055-06 drive's continuous output ceiling —
-  #   NOT the motor rated current. Sustained motor torque > 0.319 N·m overheats the motor.
-  iPeakDrives:  [2.795, 2.795]   # Maxon EC60 rated current [A]
-  motorCstt:    [0.114, 0.114]   # Maxon EC60 torque constant Kt [N·m/A]
-
-  # Status: VERIFIED — confirmed correct directions during motor spin tests.
-  #   Joint 0 (shoulder): sign=-1 — positive joint torque cmd → positive joint angle change → drives to θ₁_max
-  #   Joint 1 (elbow):    sign=+1 — positive joint torque cmd → drives toward θ₂_min (more negative)
-  qSigns:       [1, 1]
-
-  # ── Joint limits ──────────────────────────────────────────────────────────────
-  # Status: MUST VERIFY — these are design values from system modelling.
-  #   Confirm actual mechanical limits by commanding motion toward each stop.
-  # Format: [θ1_min, θ1_max, θ2_min, θ2_max] in degrees
-  # Limits are set 2° beyond the physical hard stops so encoder noise while the arm
-  # sits against a stop does not immediately trigger the e-stop. JointMT torque
-  # clipping and the mechanical stops prevent the arm exceeding the true stop angle.
-  qLimits: [-360, 360, -360, 360] # TODO: REINSTATE JOINT LIMITS — MUST VERIFY on hardware
-
-  # ── Calibration ───────────────────────────────────────────────────────────────
-  # Status: MUST VERIFY — these are the KNOWN joint angles at each mechanical hard stop.
-  #   Procedure: physically measure the true joint angle at each stop from robot geometry,
-  #   or run CalibState and verify the arm position matches expected geometry at completion.
-  #   NOTE: The q=[...] printout during CalibState shows PRE-calibration raw encoder values
-  #   relative to power-on position — those numbers do NOT directly give the stop angle.
-  #   Wrong qCalibration values corrupt ALL kinematics and force control.
-  # Format: [θ₁_cal_deg, θ₂_cal_deg]
-  #   Joint 0 (shoulder): pressing encoder/Enter in CalibState labels current position as 100°
-  #   Joint 1 (elbow):    pressing encoder/Enter in CalibState labels current position as −50°
-  qCalibration: [0, 0]   # [θ₁_cal_deg, θ₂_cal_deg] in degrees — MUST VERIFY on hardware
-
-  # ── Friction model ────────────────────────────────────────────────────────────
-  # Status: ESTIMATE — replace after system identification.
-  #   All values here are in JOINT N·m (reductionRatio=15 applied in JointMT).
-  #   Set both to 0.0 for initial therapy testing; add back after measuring on hardware.
-  # Applied in setEndEffForceWithCompensation():
-  #   τ_fric = frictionCoul × sign(dq) + frictionVis × dq   (gated by 0.03 rad/s deadband)
-  frictionVis:  [0.33, 0.76]    # Viscous  [N·m·s/rad at joint] — zeroed until system ID
-  frictionCoul: [0.35, 0.19]    # Coulomb  [N·m at joint]       — zeroed until system ID
-
-  # ── Safety envelope ──────────────────────────────────────────────────────────
-  # Status: VERIFIED reasonable — motors physically cannot produce 20 N at end-effector
-  #   (~5 N max from joint torque via Jᵀ), so this cap is a backstop against calculation errors.
-  #   Review before clinical use with patients.
-  maxEndEffForce: 20.0        # Max end-effector contact force (XY) [N]
+      center_x: 0.0  # Frame center x relative to base [m]
+      center_y: 0.0  # Frame center y relative to base [m]
+      width: 0.60  # Frame width [m]
+      height: 0.40  # Frame height [m]
+      boundary: 0.02  # Frame clearance [m]
+  iPeakDrives: [2.795]  # Drive peak current limit [A]
+  motorCstt: [0.114]  # Motor torque constant [N*m/A]
+  qSigns: [1]  # Joint direction sign correction
+  qLimits: [-360, 360]  # Joint minimum and maximum angles [deg]
+  qCalibration: [0]  # Calibration reference angle [deg]
+  frictionVis: [0.33]  # Viscous friction coefficient [N*m*s/rad]
+  frictionCoul: [0.35]  # Coulomb friction coefficient [N*m]
+  maxEndEffForce: 20.0  # Maximum end-effector force [N]
 
 Robot1:
-  # Robot 1 currently shares the same hardware and control values as Robot 0.
-  # Its workspace pose will be supplied independently once IMU integration is added.
-  drive_node_ids: [2, 4]  # Joint 0, Joint 1 CAN node IDs
-  L1: 0.43
-  L2: 0.37
-  parallel_ratio: 1.0
-
-  dqMax: 200
-  tauMax: 3.0
-  tauSafetyMax: 6.0
-  qDampingWidth: 10.0
-  qDampingGain: 0.5
-  singularityDampingAngleExtended: 15.0
-  singularityDampingAngleFolded: 15.0
-  singularityDampingGain: 0.5
-
+  drive_node_ids: [3]  # CANopen drive node ID
+  L1: 0.43  # Proximal link length [m]
+  L2: 0.37  # Distal link length [m]
+  parallel_ratio: 1.0  # Parallel linkage ratio
+  dqMax: 200  # Maximum joint speed [deg/s]
+  tauMax: 3.0  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 6.0  # Measured joint torque stop threshold [N*m]
+  qDampingWidth: 10.0  # Soft-limit damping band [deg]
+  qDampingGain: 0.5  # Soft-limit damping gain [N*m*s/rad]
+  singularityDampingAngleExtended: 15.0  # Extended singularity damping range [deg]
+  singularityDampingAngleFolded: 15.0  # Folded singularity damping range [deg]
+  singularityDampingGain: 0.5  # Singularity damping gain [N*m*s/rad]
   collision:
-    base_x: 0.0
-    base_y: 0.0
-    base_yaw: 0.0
-    link_thickness: 0.08
-    boundary: 0.02
-    link_A_length: 0.20
-    joint_radius: 0.02
+    base_x: 0.0  # Robot base x position in shared frame [m]
+    base_y: 0.0  # Robot base y position in shared frame [m]
+    base_yaw: 0.0  # Robot base rotation in shared frame [deg]
+    link_thickness: 0.08  # Link diameter [m]
+    boundary: 0.02  # Link clearance [m]
+    link_A_length: 0.20  # Short parallel-link length [m]
+    joint_radius: 0.02  # Joint collision radius [m]
     frame:
-      center_x: 0.0
-      center_y: 0.0
-      width: 0.60
-      height: 0.40
-      boundary: 0.02
-
-  iPeakDrives: [2.795, 2.795]
-  motorCstt: [0.114, 0.114]
-  qSigns: [1, 1]
-  qLimits: [-360, 360, -360, 360]
-  qCalibration: [0, 0]
-  frictionVis: [0.33, 0.76]
-  frictionCoul: [0.35, 0.19]
-  maxEndEffForce: 20.0
+      center_x: 0.0  # Frame center x relative to base [m]
+      center_y: 0.0  # Frame center y relative to base [m]
+      width: 0.60  # Frame width [m]
+      height: 0.40  # Frame height [m]
+      boundary: 0.02  # Frame clearance [m]
+  iPeakDrives: [2.795]  # Drive peak current limit [A]
+  motorCstt: [0.114]  # Motor torque constant [N*m/A]
+  qSigns: [1]  # Joint direction sign correction
+  qLimits: [-360, 360]  # Joint minimum and maximum angles [deg]
+  qCalibration: [0]  # Calibration reference angle [deg]
+  frictionVis: [0.76]  # Viscous friction coefficient [N*m*s/rad]
+  frictionCoul: [0.19]  # Coulomb friction coefficient [N*m]
+  maxEndEffForce: 20.0  # Maximum end-effector force [N]
