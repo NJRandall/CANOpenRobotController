@@ -136,6 +136,9 @@ class RobotMTR : public Robot {
     bool isCalibrated() const { return calibrated; }
     void decalibrate()        { calibrated = false; }
     double getTauMax()  const { return tauMax; }
+    bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
+    const VM2 &calibrationDirection() const { return calibrationDirection_; }
+    const VM2 &calibrationTorque() const { return calibrationTorque_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -231,6 +234,10 @@ class RobotMTR : public Robot {
          0.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
          0.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
     };
+
+        bool automaticCalibrationEnabled_ = false;
+        VM2 calibrationDirection_ = VM2(-1.0, -1.0);
+        VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
     bool calibrated      = false;
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()

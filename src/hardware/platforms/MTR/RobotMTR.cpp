@@ -93,6 +93,9 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         return false;
     }
 
+    if (params["auto_calibration"])
+        automaticCalibrationEnabled_ = params["auto_calibration"].as<bool>();
+
     // Geometry — loaded from YAML so that tuning never requires a recompile
     if (p["L1"])             L1             = p["L1"].as<double>();
     if (p["L2"])             L2             = p["L2"].as<double>();
@@ -108,6 +111,33 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (p["dqMax"])       dqMax       = min(max(0., p["dqMax"].as<double>()), 3600.) * M_PI / 180.;
     if (p["tauMax"])      tauMax      = min(max(0., p["tauMax"].as<double>()), 80.);
     if (p["tauSafetyMax"]) tauSafetyMax = max(tauMax, p["tauSafetyMax"].as<double>());
+    YAML::Node calibrationDirection = p["calibration_direction"];
+    YAML::Node calibrationTorque = p["calibration_torque"];
+    if (calibrationDirection || calibrationTorque) {
+        bool valid = calibrationDirection && calibrationTorque &&
+                     calibrationDirection.size() == 2 && calibrationTorque.size() == 2;
+        if (valid) {
+            for (int joint = 0; joint < 2; ++joint) {
+                const double direction = calibrationDirection[joint].as<double>();
+                const double torque = calibrationTorque[joint].as<double>();
+                if ((direction != -1.0 && direction != 1.0) ||
+                    !std::isfinite(torque) || torque <= 0.0 || torque > tauMax) {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+        if (valid) {
+            for (int joint = 0; joint < 2; ++joint) {
+                calibrationDirection_[joint] = calibrationDirection[joint].as<double>();
+                calibrationTorque_[joint] = calibrationTorque[joint].as<double>();
+            }
+        } else {
+            automaticCalibrationEnabled_ = false;
+            spdlog::error("RobotMTR: Invalid auto-calibration settings for '{}'; "
+                          "automatic calibration disabled.", robotName);
+        }
+    }
     if (p["qDampingWidth"]) qDampingWidth = max(0., p["qDampingWidth"].as<double>()) * M_PI / 180.;
     if (p["qDampingGain"])  qDampingGain  = max(0., p["qDampingGain"].as<double>());
     if (p["singularityDampingAngleExtended"])

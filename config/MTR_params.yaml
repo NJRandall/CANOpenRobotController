@@ -1,3 +1,5 @@
+auto_calibration: false  # true=automatic drive-to-stop; false=manual calibration
+
 v1_unit:
   drive_node_ids: [1, 3]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
@@ -28,6 +30,8 @@ v1_unit:
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-360, 360, -360, 360]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [0, 0]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
@@ -64,6 +68,8 @@ v2_unit:
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-360, 360, -360, 360]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [0, 0]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
