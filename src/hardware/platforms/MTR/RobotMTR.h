@@ -96,6 +96,7 @@ struct MTRCollisionHitboxes {
     MTRJointHitbox origin;
     MTRJointHitbox elbowL1L2;
     MTRJointHitbox elbowAB;
+    MTRJointHitbox endEffector;
     MTRFrameHitbox frame;
 };
 
@@ -206,6 +207,7 @@ class RobotMTR : public Robot {
     double collisionBoundary = 0.02;             //!< Extra clearance [m]
     double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
     double collisionJointRadius = 0.05;          //!< Physical joint radius [m]
+    double collisionEndEffectorRadius = 0.12;    //!< End-effector hitbox radius [m] (MUST VERIFY)
     double collisionFrameCenterX = 0.0;           //!< Frame centre x in base frame [m]
     double collisionFrameCenterY = 0.0;           //!< Frame centre y in base frame [m]
     double collisionFrameWidth = 0.60;            //!< Frame width [m]

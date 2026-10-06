@@ -27,6 +27,7 @@ v1_unit:
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.20  # Short parallel-link length [m]
     joint_radius: 0.02  # Joint collision radius [m]
+    end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
     frame:
       center_x: 0.0  # Frame center x relative to base [m]
       center_y: 0.0  # Frame center y relative to base [m]
@@ -65,6 +66,7 @@ v2_unit:
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.20  # Short parallel-link length [m]
     joint_radius: 0.02  # Joint collision radius [m]
+    end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
     frame:
       center_x: 0.0  # Frame center x relative to base [m]
       center_y: 0.0  # Frame center y relative to base [m]

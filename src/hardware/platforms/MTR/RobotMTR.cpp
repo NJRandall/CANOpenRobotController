@@ -173,6 +173,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
             collisionLinkALength = max(0., collision["link_A_length"].as<double>());
         if (collision["joint_radius"])
             collisionJointRadius = max(0., collision["joint_radius"].as<double>());
+        if (collision["end_effector_radius"])
+            collisionEndEffectorRadius = max(0., collision["end_effector_radius"].as<double>());
         YAML::Node frame = collision["frame"];
         if (frame) {
             if (frame["center_x"])
@@ -410,6 +412,7 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
         {toWorkspace(origin), collisionJointRadius, collisionBoundary},
         {toWorkspace(endL1), collisionJointRadius, collisionBoundary},
         {toWorkspace(endA), collisionJointRadius, collisionBoundary},
+        {toWorkspace(endL2), collisionEndEffectorRadius, collisionBoundary},
         {toWorkspace(frameCenterLocal),
          VM2(0.5 * collisionFrameWidth, 0.5 * collisionFrameHeight),
          collisionBaseYaw,
@@ -418,7 +421,7 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
 }
 
 VM2 RobotMTR::collisionPointVelocity(std::size_t linkIndex, double fraction) const {
-    if (joints.size() < 2 || linkIndex > 3)
+    if (joints.size() < 2 || linkIndex > 4)
         return VM2::Zero();
 
     const double q1 = joints[0]->getPosition();
@@ -435,6 +438,7 @@ VM2 RobotMTR::collisionPointVelocity(std::size_t linkIndex, double fraction) con
     case 2: localVelocity = fraction * collisionLinkALength * dq2 * tangent2; break;
     case 3: localVelocity = fraction * L1 * dq1 * tangent1 +
                              collisionLinkALength * dq2 * tangent2; break;
+    case 4: localVelocity = L1 * dq1 * tangent1 + L2 * dq2 * tangent2; break;
     }
 
     const double cosine = std::cos(collisionBaseYaw);
@@ -445,7 +449,7 @@ VM2 RobotMTR::collisionPointVelocity(std::size_t linkIndex, double fraction) con
 
 VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
                                        const VM2 &force) const {
-    if (joints.size() < 2 || linkIndex > 3)
+    if (joints.size() < 2 || linkIndex > 4)
         return VM2::Zero();
 
     const double q1 = joints[0]->getPosition();
@@ -469,6 +473,10 @@ VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
     case 3:
         jacobianColumn1 = fraction * L1 * tangent1;
         jacobianColumn2 = collisionLinkALength * tangent2;
+        break;
+    case 4:
+        jacobianColumn1 = L1 * tangent1;
+        jacobianColumn2 = L2 * tangent2;
         break;
     }
 
