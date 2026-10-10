@@ -96,7 +96,7 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (params["auto_calibration"])
         automaticCalibrationEnabled_ = params["auto_calibration"].as<bool>();
     if (params["collision_avoidance"])
-        collisionAvoidanceEnabled_ = params["collision_avoidance"].as<bool>();
+        collisionUseHitboxes_ = params["collision_avoidance"].as<bool>();
     if (params["collision_prediction_horizon"])
         collisionPredictionHorizon_ = max(0., params["collision_prediction_horizon"].as<double>());
     if (params["collision_influence_distance"])

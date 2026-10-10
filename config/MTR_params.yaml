@@ -1,8 +1,8 @@
 auto_calibration: false  # true=automatic drive-to-stop; false=manual calibration
-collision_avoidance: false  # true=enable predictive spring-damper; false=disabled during validation
+collision_avoidance: false  # true=predictive hitbox avoidance; false=horizontal end-effector X avoidance
 collision_prediction_horizon: 0.15  # Constant-velocity prediction horizon [s]
-collision_influence_distance: 0.15  # Begin repulsion at this clearance [m]
-collision_spring_gain: 0.25  # Exponential spring gain [N]
+collision_influence_distance: 0.15  # Hitbox clearance or horizontal EE X separation [m]
+collision_spring_gain: 0  # Exponential spring gain [N]
 collision_decay_length: 0.05  # Exponential spring length scale [m]
 collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
 

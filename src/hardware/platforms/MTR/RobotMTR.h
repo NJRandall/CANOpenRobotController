@@ -140,7 +140,7 @@ class RobotMTR : public Robot {
     bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
     const VM2 &calibrationDirection() const { return calibrationDirection_; }
     const VM2 &calibrationTorque() const { return calibrationTorque_; }
-    bool collisionAvoidanceEnabled() const { return collisionAvoidanceEnabled_; }
+    bool collisionUsesHitboxes() const { return collisionUseHitboxes_; }
     double collisionPredictionHorizon() const { return collisionPredictionHorizon_; }
     double collisionInfluenceDistance() const { return collisionInfluenceDistance_; }
     double collisionSpringGain() const { return collisionSpringGain_; }
@@ -249,7 +249,7 @@ class RobotMTR : public Robot {
     };
 
         bool automaticCalibrationEnabled_ = false;
-        bool collisionAvoidanceEnabled_ = false;
+        bool collisionUseHitboxes_ = true;
         double collisionPredictionHorizon_ = 0.15;
         double collisionInfluenceDistance_ = 0.15;
         double collisionSpringGain_ = 0.25;
