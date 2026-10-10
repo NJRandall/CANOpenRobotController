@@ -136,6 +136,7 @@ class RobotMTR : public Robot {
     void applyCalibration();
     bool isCalibrated() const { return calibrated; }
     void decalibrate()        { calibrated = false; }
+    const VM2 &calibrationPosition() const { return qCalibration; }
     double getTauMax()  const { return tauMax; }
     bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
     const VM2 &calibrationDirection() const { return calibrationDirection_; }
