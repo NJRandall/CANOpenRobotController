@@ -54,6 +54,12 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
         // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
         lcd = new LCD1602(0x27, 2);
         lcd->init();
+
+        // MPU-6050 IMU for Left/Right orientation detection — master only (see armSide()
+        // comment in RobotMTR.h for why the listener's side is inferred rather than measured).
+        // TODO: confirm address/bus against the physical wiring. Default MPU-6050 address is
+        // 0x68 (AD0 pin low); 0x69 if AD0 is tied to 3.3V. Bus 1 is free (LCD above uses bus 2).
+        addInput(imu = new I2CMPU6050IMU(0x68, 1));
     }
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
@@ -70,6 +76,7 @@ RobotMTR::~RobotMTR() {
     delete keyboard;
     delete encoder;
     delete lcd;
+    delete imu;
     inputs.clear();
 }
 
@@ -290,7 +297,9 @@ VM2 RobotMTR::calculateGravityTorques() {
 
 void RobotMTR::updateRobot() {
     spdlog::trace("RobotMTR::updateRobot()");
-    Robot::updateRobot();   // fills jointPositions_, jointVelocities_, jointTorques_
+    Robot::updateRobot();   // fills jointPositions_, jointVelocities_, jointTorques_; also calls imu->updateInput()
+
+    updateArmSide();        // no-op if imu is null (listener) — see RobotMTR.h
 
     bool two = joints.size() > 1;
     VM2 q  (joints[0]->getPosition(), two ? joints[1]->getPosition() : 0.0);
@@ -318,6 +327,51 @@ void RobotMTR::updateRobot() {
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Device orientation (Left/Right)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+void RobotMTR::updateArmSide() {
+    if (!imu) return;   // listener — no IMU, side is inferred by the caller instead
+
+    // TODO: confirm which IMU axis reads "up" when the device is mounted upright — this is a
+    // fixed mechanical fact (how the MPU-6050 board sits inside the housing), not something
+    // derivable at runtime, so it can't be left auto-detecting. To find it: hold the device in
+    // its intended "upright/Left" orientation, print imu->getAcc(), and see which axis reads
+    // close to +9.81 m/s^2. Then pick the matching line below (only one should be uncommented).
+    double upAxisRaw = imu->getAcc()[2];   // TODO (placeholder): Z axis, default orientation
+    // double upAxisRaw = imu->getAcc()[0];   // TODO option: X axis, default orientation
+    // double upAxisRaw = imu->getAcc()[1];   // TODO option: Y axis, default orientation
+    // double upAxisRaw = -imu->getAcc()[2];  // TODO option: Z axis, inverted mounting (chip facing down)
+    // double upAxisRaw = -imu->getAcc()[0];  // TODO option: X axis, inverted mounting
+    // double upAxisRaw = -imu->getAcc()[1];  // TODO option: Y axis, inverted mounting
+
+    // Low-pass filter to reject noise/vibration before making a decision.
+    const double alpha = 0.01;   // TODO: tune — smaller = more smoothing, slower to respond
+    armSideAxisFiltered_ += alpha * (upAxisRaw - armSideAxisFiltered_);
+
+    // Dead-zone (Schmitt-trigger) decision: upright (~+1g on the up axis) -> LEFT,
+    // flipped 180° (~-1g) -> RIGHT. The dead zone is the band of tilt angles around the 90°
+    // boundary where we deliberately do NOT commit to either side, so mounting slop or
+    // vibration near the boundary can't cause a spurious decision. The housing is rigid (can
+    // only physically sit at ~0° or ~180°), so this margin only needs to cover mounting
+    // tolerance, not a genuinely ambiguous resting angle — kept tight for a fast, confident
+    // decision rather than generously wide.
+    // reading = g*cos(tilt), so |reading| < deadZoneThreshold <=> tilt within (90 ± marginDeg)°.
+    const double g                 = 9.80665;
+    const double marginDeg         = 30.0;    // TODO: tune against actual mounting tolerance
+    const double deadZoneThreshold = g * std::cos(marginDeg * M_PI / 180.0);
+
+    if (armSideAxisFiltered_ > deadZoneThreshold) {
+        armSide_ = ArmSide::LEFT;
+    } else if (armSideAxisFiltered_ < -deadZoneThreshold) {
+        armSide_ = ArmSide::RIGHT;
+    }
+    // else: inside the dead zone — ambiguous reading, keep the previous (latched) classification
+    // rather than forcing a decision from a noisy/boundary sample.
 }
 
 
