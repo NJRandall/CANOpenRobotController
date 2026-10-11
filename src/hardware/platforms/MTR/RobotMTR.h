@@ -139,6 +139,7 @@ class RobotMTR : public Robot {
     const VM2 &calibrationPosition() const { return qCalibration; }
     double getTauMax()  const { return tauMax; }
     bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
+    const std::vector<int> &configuredDriveNodeIds() const { return driveNodeIds; }
     const VM2 &calibrationDirection() const { return calibrationDirection_; }
     const VM2 &calibrationTorque() const { return calibrationTorque_; }
     bool collisionUsesHitboxes() const { return collisionUseHitboxes_; }

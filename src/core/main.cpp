@@ -177,6 +177,7 @@ int main(int argc, char *argv[]) {
             spdlog::info("{}: -", CANdeviceList[i]);
         }
     }
+    app_setCANInterface(CANdevice);
     configureCANopen(nodeId, rtPriority, CANdevice0Index, CANdevice);
 
     struct ros_arg_holder *ros_args = (ros_arg_holder *)malloc(sizeof(*ros_args));
