@@ -97,6 +97,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         automaticCalibrationEnabled_ = params["auto_calibration"].as<bool>();
     if (params["collision_avoidance"])
         collisionUseHitboxes_ = params["collision_avoidance"].as<bool>();
+    if (params["collision_log_only"])
+        collisionLogOnly_ = params["collision_log_only"].as<bool>();
     if (params["collision_prediction_horizon"])
         collisionPredictionHorizon_ = max(0., params["collision_prediction_horizon"].as<double>());
     if (params["collision_influence_distance"])
@@ -498,6 +500,17 @@ VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
 void RobotMTR::updateRobot() {
     spdlog::trace("RobotMTR::updateRobot()");
     Robot::updateRobot();   // fills jointPositions_, jointVelocities_, jointTorques_
+
+    // TEMP: log statusword changes to identify the E-stop signature.
+    static std::vector<int> lastStatus;
+    lastStatus.resize(joints.size(), -1);
+    for (size_t i = 0; i < joints.size(); ++i) {
+        int sw = static_cast<JointMT *>(joints[i])->getDriveStatus();
+        if (sw != lastStatus[i]) {
+            spdlog::warn("[ESTOP-PROBE] {} joint {} statusword 0x{:04x} -> 0x{:04x}", robotName, i, lastStatus[i] & 0xFFFF, sw);
+            lastStatus[i] = sw;
+        }
+    }
 
     bool two = joints.size() > 1;
     VM2 q  (joints[0]->getPosition(), two ? joints[1]->getPosition() : 0.0);

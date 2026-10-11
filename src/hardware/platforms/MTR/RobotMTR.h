@@ -147,6 +147,7 @@ class RobotMTR : public Robot {
     double collisionSpringGain() const { return collisionSpringGain_; }
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
+    bool collisionLogOnly() const { return collisionLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -251,6 +252,7 @@ class RobotMTR : public Robot {
 
         bool automaticCalibrationEnabled_ = false;
         bool collisionUseHitboxes_ = true;
+        bool collisionLogOnly_ = false;
         double collisionPredictionHorizon_ = 0.15;
         double collisionInfluenceDistance_ = 0.15;
         double collisionSpringGain_ = 0.25;
