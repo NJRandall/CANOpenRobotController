@@ -6,6 +6,9 @@
 #include <cstdio>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
+
+#include "CO_command.h"   // cancomm_socketFree() — used directly by checkDriveAlive()
 
 using namespace Eigen;
 using namespace std;
@@ -18,7 +21,7 @@ using namespace std;
 // New overload constructs joints based on explicit drive_node_ids
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                    const std::vector<int> &drive_node_ids, bool isMaster)
-    : Robot(robot_name, yaml_config_file), isMaster_(isMaster) {
+    : Robot(robot_name, yaml_config_file), isMaster_(isMaster), driveNodeIds_(drive_node_ids) {
 
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
@@ -330,8 +333,43 @@ void RobotMTR::updateRobot() {
         disable();
     }
 
+    // Throttled drive-liveness check — sets safetyTriggered_ on failure, which safetyStop
+    // (MTRobotMachine.cpp) turns into an EmergencyStop transition.
+    if (++livenessCheckCounter_ >= livenessCheckPeriod_) {
+        livenessCheckCounter_ = 0;
+        for (int nodeID : driveNodeIds_) {
+            if (!checkDriveAlive(nodeID)) {
+                spdlog::error("RobotMTR: drive node {} not responding — treating as lost.", nodeID);
+                safetyTriggered_ = true;
+                disable();
+                break;
+            }
+        }
+    }
+
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Drive liveness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// SDO read of register 0x6076 (static, read-only), checking for "OK" in the reply — the
+// same check Drive::sendSDOMessages() already does internally. Kept MTR-local rather than
+// reusing Drive's version, which is shared with other robot platforms.
+bool RobotMTR::checkDriveAlive(int nodeID) {
+#ifdef NOROBOT
+    (void)nodeID;
+    return true;
+#else
+    std::stringstream cmd;
+    cmd << "[1] " << nodeID << " read 0x6076 0 i16 ";
+    char returnMessage[STRING_BUFFER_SIZE];
+    cancomm_socketFree(const_cast<char *>(cmd.str().c_str()), returnMessage);
+    return std::string(returnMessage).find("OK") != std::string::npos;
+#endif
 }
 
 

@@ -147,6 +147,7 @@ class RobotMTR : public Robot {
     // ── Safety ────────────────────────────────────────────────────────────────
     setMovementReturnCode_t safetyCheck();
     bool hasSafetyTriggered() const { return safetyTriggered_; }
+    void clearSafetyTrigger()       { safetyTriggered_ = false; }  // called on EmergencyStop reset
 
     // ── Calibration ───────────────────────────────────────────────────────────
     void applyCalibration();
@@ -245,6 +246,19 @@ class RobotMTR : public Robot {
      * safety check, so there's no reason to throttle it.
      */
     void updateArmSide();
+
+    // ── Drive liveness ─────────────────────────────────────────────────────────
+    // Periodic check that each drive node still answers on the CAN bus — "drivers are not
+    // there anymore" sets safetyTriggered_, which safetyStop (MTRobotMachine.cpp) turns into
+    // an EmergencyStop transition. Kept MTR-local: calls cancomm_socketFree() directly with
+    // the same SDO-read-and-check-for-"OK" logic Drive::sendSDOMessages() already uses,
+    // rather than going through Drive/CopleyDrive (shared with other robot platforms).
+    std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
+    int livenessCheckCounter_ = 0;
+    static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
+                                                       // SDO round-trips are slow/blocking,
+                                                       // unlike the PDO-based control traffic
+    bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
     double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]
