@@ -125,6 +125,12 @@ class RobotMTR : public Robot {
      *  orientation once the master's own IMU reading has been decided. */
     void setArmSide(ArmSide s) { armSide_ = s; }
 
+    // ── Bimanual control role ──────────────────────────────────────────────────
+    // Which arm drives the live reference in MultiControllerState. Unrelated to isMaster()
+    // (BB role) or armSide() (mounting). Chosen via the master's encoder in CalibState.
+    bool isLeader() const { return isLeader_; }
+    void setLeader(bool v) { isLeader_ = v; }
+
     // ── Drive mode initialisation ─────────────────────────────────────────────
     bool initTorqueControl()   override;
     bool initPositionControl() override;
@@ -223,6 +229,7 @@ class RobotMTR : public Robot {
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
     bool isMaster_        = true; // true: constructs keyboard/encoder/lcd/imu; false: CAN-only listener
+    bool isLeader_        = false; // bimanual control role — see isLeader() above
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
     I2CMPU6050IMU *imu = nullptr;   // master only — see armSide() comment above
