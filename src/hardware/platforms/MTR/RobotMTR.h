@@ -95,7 +95,7 @@ class RobotMTR : public Robot {
     // Overload allowing explicit drive node ids (single-drive test wrapper uses this).
     // isMaster: true (default) constructs the Keyboard/RotaryEncoder/LCD1602 UI hardware —
     // only one physical unit should be master. A non-master instance leaves keyboard/encoder/lcd
-    // as nullptr: it only drives its motors over CAN, matching the doc's "listening BB" role.
+    // as nullptr: it only drives its motors over CAN, acting as a CAN-only listener.
     RobotMTR(const std::string &robot_name,
              const std::string &yaml_config_file,
              const std::vector<int> &drive_node_ids,
@@ -248,11 +248,11 @@ class RobotMTR : public Robot {
     void updateArmSide();
 
     // ── Drive liveness ─────────────────────────────────────────────────────────
-    // Periodic check that each drive node still answers on the CAN bus — "drivers are not
-    // there anymore" sets safetyTriggered_, which safetyStop (MTRobotMachine.cpp) turns into
-    // an EmergencyStop transition. Kept MTR-local: calls cancomm_socketFree() directly with
-    // the same SDO-read-and-check-for-"OK" logic Drive::sendSDOMessages() already uses,
-    // rather than going through Drive/CopleyDrive (shared with other robot platforms).
+    // Periodic check that each drive node still answers on the CAN bus. A non-responding
+    // node sets safetyTriggered_, which safetyStop (MTRobotMachine.cpp) turns into an
+    // EmergencyStop transition. Kept MTR-local: calls cancomm_socketFree() directly with the
+    // same SDO-read-and-check-for-"OK" logic Drive::sendSDOMessages() already uses, rather
+    // than going through Drive/CopleyDrive (shared with other robot platforms).
     std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
     int livenessCheckCounter_ = 0;
     static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
