@@ -63,6 +63,7 @@
 #include "RotaryEncoder.h"  // KY-040 rotary encoder with push button
 #include "LCD1602.h"        // 16×2 LCD via PCF8574 I2C backpack
 #include "I2CMPU6050IMU.h"  // MPU-6050 IMU — device orientation (Left/Right) detection
+#include "USBMouse.h"       // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR
 #include "Robot.h"          // CORC Robot base class
 #include "CopleyDrive.h"    // Copley drive interface
 
@@ -106,6 +107,7 @@ class RobotMTR : public Robot {
     Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
     RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
     LCD1602       *lcd      = nullptr;  //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27) — master only
+    USBMouse      *mouse    = nullptr;  //!< Optional local USB mouse (/dev/input/mouse0) — master only
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
     // Only the master reads an IMU: master and listener are two separate BeagleBones, and I2C

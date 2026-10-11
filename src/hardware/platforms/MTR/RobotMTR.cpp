@@ -60,6 +60,10 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
         // TODO: confirm address/bus against the physical wiring. Default MPU-6050 address is
         // 0x68 (AD0 pin low); 0x69 if AD0 is tied to 3.3V. Bus 1 is free (LCD above uses bus 2).
         addInput(imu = new I2CMPU6050IMU(0x68, 1));
+
+        // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR, used if
+        // present; isConnected() is false (not a crash) when no mouse is plugged in.
+        addInput(mouse = new USBMouse());
     }
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
@@ -77,6 +81,7 @@ RobotMTR::~RobotMTR() {
     delete encoder;
     delete lcd;
     delete imu;
+    delete mouse;
     inputs.clear();
 }
 
