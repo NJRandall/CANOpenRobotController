@@ -6,6 +6,9 @@
 #include <cstdio>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
+
+#include "CO_command.h"   // cancomm_socketFree() — used directly by checkDriveAlive()
 
 using namespace Eigen;
 using namespace std;
@@ -17,8 +20,8 @@ using namespace std;
 
 // New overload constructs joints based on explicit drive_node_ids
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
-                   const std::vector<int> &drive_node_ids)
-    : Robot(robot_name, yaml_config_file) {
+                   const std::vector<int> &drive_node_ids, bool isMaster)
+    : Robot(robot_name, yaml_config_file), isMaster_(isMaster), driveNodeIds_(drive_node_ids) {
 
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
@@ -46,14 +49,29 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              qDampingWidth, qDampingGain));
     }
 
-    addInput(keyboard = new Keyboard());
+    // UI hardware (keyboard/encoder/LCD) is master-only: a non-master unit has none of
+    // this physically wired — it only drives its motors over CAN — so keyboard/encoder/lcd
+    // stay nullptr (their in-class initialisers) rather than aliasing the master's hardware.
+    if (isMaster_) {
+        addInput(keyboard = new Keyboard());
 
-    // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
-    addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
+        // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
+        addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
 
-    // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
-    lcd = new LCD1602(0x27, 2);
-    lcd->init();
+        // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
+        lcd = new LCD1602(0x27, 2);
+        lcd->init();
+
+        // MPU-6050 IMU for Left/Right orientation detection — master only (see armSide()
+        // comment in RobotMTR.h for why the listener's side is inferred rather than measured).
+        // TODO: confirm address/bus against the physical wiring. Default MPU-6050 address is
+        // 0x68 (AD0 pin low); 0x69 if AD0 is tied to 3.3V. Bus 1 is free (LCD above uses bus 2).
+        addInput(imu = new I2CMPU6050IMU(0x68, 1));
+
+        // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR, used if
+        // present; isConnected() is false (not a crash) when no mouse is plugged in.
+        addInput(mouse = new USBMouse());
+    }
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
@@ -69,6 +87,8 @@ RobotMTR::~RobotMTR() {
     delete keyboard;
     delete encoder;
     delete lcd;
+    delete imu;
+    delete mouse;
     inputs.clear();
 }
 
@@ -499,7 +519,9 @@ VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
 
 void RobotMTR::updateRobot() {
     spdlog::trace("RobotMTR::updateRobot()");
-    Robot::updateRobot();   // fills jointPositions_, jointVelocities_, jointTorques_
+    Robot::updateRobot();   // fills jointPositions_, jointVelocities_, jointTorques_; also calls imu->updateInput()
+
+    updateArmSide();        // no-op if imu is null (listener) — see RobotMTR.h
 
     // TEMP: log statusword changes to identify the E-stop signature.
     static std::vector<int> lastStatus;
@@ -536,8 +558,88 @@ void RobotMTR::updateRobot() {
         disable();
     }
 
+    // Throttled drive-liveness check — sets safetyTriggered_ on failure, which safetyStop
+    // (MTRobotMachine.cpp) turns into an EmergencyStop transition.
+    if (++livenessCheckCounter_ >= livenessCheckPeriod_) {
+        livenessCheckCounter_ = 0;
+        for (int nodeID : driveNodeIds_) {
+            if (!checkDriveAlive(nodeID)) {
+                spdlog::error("RobotMTR: drive node {} not responding — treating as lost.", nodeID);
+                safetyTriggered_ = true;
+                disable();
+                break;
+            }
+        }
+    }
+
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Drive liveness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// SDO read of register 0x6076 (static, read-only), checking for "OK" in the reply — the
+// same check Drive::sendSDOMessages() already does internally. Kept MTR-local rather than
+// reusing Drive's version, which is shared with other robot platforms.
+bool RobotMTR::checkDriveAlive(int nodeID) {
+#ifdef NOROBOT
+    (void)nodeID;
+    return true;
+#else
+    std::stringstream cmd;
+    cmd << "[1] " << nodeID << " read 0x6076 0 i16 ";
+    char returnMessage[STRING_BUFFER_SIZE];
+    cancomm_socketFree(const_cast<char *>(cmd.str().c_str()), returnMessage);
+    return std::string(returnMessage).find("OK") != std::string::npos;
+#endif
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Device orientation (Left/Right)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+void RobotMTR::updateArmSide() {
+    if (!imu) return;   // listener — no IMU, side is inferred by the caller instead
+
+    // TODO: confirm which IMU axis reads "up" when the device is mounted upright — this is a
+    // fixed mechanical fact (how the MPU-6050 board sits inside the housing), not something
+    // derivable at runtime, so it can't be left auto-detecting. To find it: hold the device in
+    // its intended "upright/Left" orientation, print imu->getAcc(), and see which axis reads
+    // close to +9.81 m/s^2. Then pick the matching line below (only one should be uncommented).
+    double upAxisRaw = imu->getAcc()[2];   // TODO (placeholder): Z axis, default orientation
+    // double upAxisRaw = imu->getAcc()[0];   // TODO option: X axis, default orientation
+    // double upAxisRaw = imu->getAcc()[1];   // TODO option: Y axis, default orientation
+    // double upAxisRaw = -imu->getAcc()[2];  // TODO option: Z axis, inverted mounting (chip facing down)
+    // double upAxisRaw = -imu->getAcc()[0];  // TODO option: X axis, inverted mounting
+    // double upAxisRaw = -imu->getAcc()[1];  // TODO option: Y axis, inverted mounting
+
+    // Low-pass filter to reject noise/vibration before making a decision.
+    const double alpha = 0.01;   // TODO: tune — smaller = more smoothing, slower to respond
+    armSideAxisFiltered_ += alpha * (upAxisRaw - armSideAxisFiltered_);
+
+    // Dead-zone (Schmitt-trigger) decision: upright (~+1g on the up axis) -> LEFT,
+    // flipped 180° (~-1g) -> RIGHT. The dead zone is the band of tilt angles around the 90°
+    // boundary where we deliberately do NOT commit to either side, so mounting slop or
+    // vibration near the boundary can't cause a spurious decision. The housing is rigid (can
+    // only physically sit at ~0° or ~180°), so this margin only needs to cover mounting
+    // tolerance, not a genuinely ambiguous resting angle — kept tight for a fast, confident
+    // decision rather than generously wide.
+    // reading = g*cos(tilt), so |reading| < deadZoneThreshold <=> tilt within (90 ± marginDeg)°.
+    const double g                 = 9.80665;
+    const double marginDeg         = 30.0;    // TODO: tune against actual mounting tolerance
+    const double deadZoneThreshold = g * std::cos(marginDeg * M_PI / 180.0);
+
+    if (armSideAxisFiltered_ > deadZoneThreshold) {
+        armSide_ = ArmSide::LEFT;
+    } else if (armSideAxisFiltered_ < -deadZoneThreshold) {
+        armSide_ = ArmSide::RIGHT;
+    }
+    // else: inside the dead zone — ambiguous reading, keep the previous (latched) classification
+    // rather than forcing a decision from a noisy/boundary sample.
 }
 
 

@@ -62,12 +62,33 @@
 #include "Keyboard.h"       // Keyboard input (development / fallback)
 #include "RotaryEncoder.h"  // KY-040 rotary encoder with push button
 #include "LCD1602.h"        // 16×2 LCD via PCF8574 I2C backpack
+#include "I2CMPU6050IMU.h"  // MPU-6050 IMU — device orientation (Left/Right) detection
+#include "USBMouse.h"       // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR
 #include "Robot.h"          // CORC Robot base class
 #include "CopleyDrive.h"    // Copley drive interface
 
 typedef Eigen::Vector2d VM2;   //!< 2-vector (planar XY workspace)
 typedef Eigen::VectorXd VX;    //!< Dynamic-size vector (for FLNLHelper / logging)
 
+/**
+ * Which way this physical unit is mounted, decided from its IMU reading.
+ * UNKNOWN until the dead zone around the flip boundary is cleared at least once
+ * (see RobotMTR::updateArmSide()).
+ */
+enum class ArmSide { UNKNOWN, LEFT, RIGHT };
+
+/** The other side: LEFT<->RIGHT, UNKNOWN stays UNKNOWN. Used to infer the listener's side
+ *  from the master's measured side — see RobotMTR::setArmSide(). */
+inline ArmSide oppositeArmSide(ArmSide s) {
+    if (s == ArmSide::LEFT)  return ArmSide::RIGHT;
+    if (s == ArmSide::RIGHT) return ArmSide::LEFT;
+    return ArmSide::UNKNOWN;
+}
+
+
+class RobotMTR : public Robot {
+   public:
+    // Original two-arg constructor retained for backward compatibility (master: has UI hardware)
 struct MTRLinkHitbox {
     VM2 start;       //!< Centreline start point in the shared workspace [m]
     VM2 end;         //!< Centreline end point in the shared workspace [m]
@@ -106,15 +127,46 @@ class RobotMTR : public Robot {
     RobotMTR(const std::string &robot_name      = "RobotMTR",
              const std::string &yaml_config_file = "");
 
-    // Overload allowing explicit drive node ids (single-drive test wrapper uses this)
+    // Overload allowing explicit drive node ids (single-drive test wrapper uses this).
+    // isMaster: true (default) constructs the Keyboard/RotaryEncoder/LCD1602 UI hardware —
+    // only one physical unit should be master. A non-master instance leaves keyboard/encoder/lcd
+    // as nullptr: it only drives its motors over CAN, acting as a CAN-only listener.
     RobotMTR(const std::string &robot_name,
              const std::string &yaml_config_file,
-             const std::vector<int> &drive_node_ids);
+             const std::vector<int> &drive_node_ids,
+             bool isMaster = true);
     ~RobotMTR();
 
-    Keyboard      *keyboard;  //!< Keyboard input (fallback / development)
-    RotaryEncoder *encoder;   //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15)
-    LCD1602       *lcd;       //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27)
+    bool isMaster() const { return isMaster_; }
+
+    Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
+    RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
+    LCD1602       *lcd      = nullptr;  //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27) — master only
+    USBMouse      *mouse    = nullptr;  //!< Optional local USB mouse (/dev/input/mouse0) — master only
+
+    // ── Device orientation (Left/Right) ───────────────────────────────────────
+    // Only the master reads an IMU: master and listener are two separate BeagleBones, and I2C
+    // is a local bus (not networked), so the master's process can't read a listener-side IMU
+    // directly anyway. In this project's fixed bimanual mount the two arms are necessarily
+    // mounted 180° apart, so the listener's side is simply the logical opposite of whatever
+    // the master's IMU reads — no second reading is needed for the configurations this
+    // project currently supports.
+    // FUTURE EXTENSION: if a configuration ever needs the listener's orientation measured
+    // rather than inferred (e.g. a non-fixed/independent mount), the listener would need its
+    // own local IMU read on its own board and the result sent to the master over the existing
+    // master<->listener channel — a second I2CMPU6050IMU here would not be reachable from the
+    // master's process. See setArmSide() below for how that result would be applied.
+    ArmSide armSide() const { return armSide_; }
+
+    /** Manually set this robot's side — used to apply the listener's inferred (not measured)
+     *  orientation once the master's own IMU reading has been decided. */
+    void setArmSide(ArmSide s) { armSide_ = s; }
+
+    // ── Bimanual control role ──────────────────────────────────────────────────
+    // Which arm drives the live reference in MultiControllerState. Unrelated to isMaster()
+    // (BB role) or armSide() (mounting). Chosen via the master's encoder in CalibState.
+    bool isLeader() const { return isLeader_; }
+    void setLeader(bool v) { isLeader_ = v; }
 
     // ── Drive mode initialisation ─────────────────────────────────────────────
     bool initTorqueControl()   override;
@@ -131,6 +183,7 @@ class RobotMTR : public Robot {
     // ── Safety ────────────────────────────────────────────────────────────────
     setMovementReturnCode_t safetyCheck();
     bool hasSafetyTriggered() const { return safetyTriggered_; }
+    void clearSafetyTrigger()       { safetyTriggered_ = false; }  // called on EmergencyStop reset
 
     // ── Calibration ───────────────────────────────────────────────────────────
     void applyCalibration();
@@ -270,6 +323,34 @@ class RobotMTR : public Robot {
     bool calibrated      = false;
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
+    bool isMaster_        = true; // true: constructs keyboard/encoder/lcd/imu; false: CAN-only listener
+    bool isLeader_        = false; // bimanual control role — see isLeader() above
+
+    // ── Device orientation (Left/Right) ───────────────────────────────────────
+    I2CMPU6050IMU *imu = nullptr;   // master only — see armSide() comment above
+    ArmSide armSide_             = ArmSide::UNKNOWN;
+    double  armSideAxisFiltered_ = 0.0;   // low-pass filtered "up axis" reading [m/s^2]
+
+    /**
+     * \brief Read the IMU, low-pass filter it, and update armSide_ via a dead-zone
+     * (Schmitt-trigger) decision. No-op if imu is null (listener / no IMU).
+     * Called every updateRobot() cycle — this is a filtered read + comparison, not a
+     * safety check, so there's no reason to throttle it.
+     */
+    void updateArmSide();
+
+    // ── Drive liveness ─────────────────────────────────────────────────────────
+    // Periodic check that each drive node still answers on the CAN bus. A non-responding
+    // node sets safetyTriggered_, which safetyStop (MTRobotMachine.cpp) turns into an
+    // EmergencyStop transition. Kept MTR-local: calls cancomm_socketFree() directly with the
+    // same SDO-read-and-check-for-"OK" logic Drive::sendSDOMessages() already uses, rather
+    // than going through Drive/CopleyDrive (shared with other robot platforms).
+    std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
+    int livenessCheckCounter_ = 0;
+    static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
+                                                       // SDO round-trips are slow/blocking,
+                                                       // unlike the PDO-based control traffic
+    bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
     double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]
