@@ -96,6 +96,7 @@ struct MTRCollisionHitboxes {
     MTRJointHitbox origin;
     MTRJointHitbox elbowL1L2;
     MTRJointHitbox elbowAB;
+    MTRJointHitbox endEffector;
     MTRFrameHitbox frame;
 };
 
@@ -125,6 +126,7 @@ class RobotMTR : public Robot {
     bool initialiseNetwork() override;
     bool initialiseInputs()  override;
     void updateRobot()       override;
+    std::size_t probeDriveNodes() const;
 
     // ── Safety ────────────────────────────────────────────────────────────────
     setMovementReturnCode_t safetyCheck();
@@ -134,7 +136,19 @@ class RobotMTR : public Robot {
     void applyCalibration();
     bool isCalibrated() const { return calibrated; }
     void decalibrate()        { calibrated = false; }
+    const VM2 &calibrationPosition() const { return qCalibration; }
     double getTauMax()  const { return tauMax; }
+    bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
+    const std::vector<int> &configuredDriveNodeIds() const { return driveNodeIds; }
+    const VM2 &calibrationDirection() const { return calibrationDirection_; }
+    const VM2 &calibrationTorque() const { return calibrationTorque_; }
+    bool collisionUsesHitboxes() const { return collisionUseHitboxes_; }
+    double collisionPredictionHorizon() const { return collisionPredictionHorizon_; }
+    double collisionInfluenceDistance() const { return collisionInfluenceDistance_; }
+    double collisionSpringGain() const { return collisionSpringGain_; }
+    double collisionDecayLength() const { return collisionDecayLength_; }
+    double collisionDampingGain() const { return collisionDampingGain_; }
+    bool collisionLogOnly() const { return collisionLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -151,9 +165,13 @@ class RobotMTR : public Robot {
 
     /** Build the four link hitboxes for a supplied joint configuration. */
     MTRCollisionHitboxes getCollisionHitboxes(VM2 q) const;
+    VM2 collisionPointVelocity(std::size_t linkIndex, double fraction) const;
+    VM2 collisionPointJointTorque(std::size_t linkIndex, double fraction,
+                                  const VM2 &force) const;
 
     // ── Joint-space setters ───────────────────────────────────────────────────
-    setMovementReturnCode_t setJointTorque(VM2 tau);
+    setMovementReturnCode_t setJointTorque(VM2 tau,
+                                            bool applySingularityDamping = true);
     setMovementReturnCode_t setJointPosition(VM2 q);
     setMovementReturnCode_t setJointVelocity(VM2 dq);
 
@@ -161,6 +179,8 @@ class RobotMTR : public Robot {
     /** τ = Jᵀ·F + τ_friction  (no gravity term — horizontal plane). */
     setMovementReturnCode_t setEndEffForceWithCompensation(VM2 F,
                                                            bool friction_comp = true);
+    setMovementReturnCode_t setEndEffForceWithCompensation(
+        VM2 F, bool friction_comp, const VM2 &collisionPriorityTorque);
 
     // ── State readers (VX for FLNLHelper / CSV logging) ──────────────────────
     const VX &getEndEffPosition();
@@ -190,6 +210,7 @@ class RobotMTR : public Robot {
     double collisionBoundary = 0.02;             //!< Extra clearance [m]
     double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
     double collisionJointRadius = 0.05;          //!< Physical joint radius [m]
+    double collisionEndEffectorRadius = 0.12;    //!< End-effector hitbox radius [m] (MUST VERIFY)
     double collisionFrameCenterX = 0.0;           //!< Frame centre x in base frame [m]
     double collisionFrameCenterY = 0.0;           //!< Frame centre y in base frame [m]
     double collisionFrameWidth = 0.60;            //!< Frame width [m]
@@ -234,6 +255,17 @@ class RobotMTR : public Robot {
          -10.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
          140.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
     };
+
+        bool automaticCalibrationEnabled_ = false;
+        bool collisionUseHitboxes_ = true;
+        bool collisionLogOnly_ = false;
+        double collisionPredictionHorizon_ = 0.15;
+        double collisionInfluenceDistance_ = 0.15;
+        double collisionSpringGain_ = 0.25;
+        double collisionDecayLength_ = 0.05;
+        double collisionDampingGain_ = 2.0;
+        VM2 calibrationDirection_ = VM2(-1.0, -1.0);
+        VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
     bool calibrated      = false;
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
