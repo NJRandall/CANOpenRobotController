@@ -47,6 +47,15 @@ echo -n "rsync -chaz -e 'ssh -q' ${CONFIG_FOLDER} $SSH_USER@$SSH_IP_ADDR:~/CANOp
 rsync -chaz -e 'ssh -q' ${CONFIG_FOLDER} $SSH_USER@$SSH_IP_ADDR:~/CANOpenRobotController/${CONFIG_FOLDER}
 echo "done."
 
+
+# NICK DODGY EDIT: if cross-compiling, the binary will be in build/ and expect config/ to be in build/config/
+echo ""
+echo "## Copy config into build/config/ (cross-compile: BASE_DIRECTORY=. so binary reads ./config/ from build/):"
+echo -n "rsync -chaz -e 'ssh -q' ${CONFIG_FOLDER} $SSH_USER@$SSH_IP_ADDR:~/CANOpenRobotController/${BUILD_FOLDER}${CONFIG_FOLDER} ... "
+rsync -chaz -e 'ssh -q' ${CONFIG_FOLDER} $SSH_USER@$SSH_IP_ADDR:~/CANOpenRobotController/${BUILD_FOLDER}${CONFIG_FOLDER}
+echo "done."
+
+
 echo ""
 echo "## Copy APP(s):"
 echo -n "rsync -chaz -e 'ssh -q' --include='*APP' --include='*APP_NOROBOT' --exclude='*' ${BUILD_FOLDER} $SSH_USER@$SSH_IP_ADDR:~/CANOpenRobotController/${BUILD_FOLDER} ... "
