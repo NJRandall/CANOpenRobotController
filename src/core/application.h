@@ -85,6 +85,12 @@ void app_programStart();
 void app_communicationReset(int argc = 0, char *argv[] = {});
 
 /**
+ * Set/get the CAN interface selected by the CORC process.
+ */
+void app_setCANInterface(const char *interfaceName);
+const char *app_getCANInterface();
+
+/**
  * \brief Function is called just before program ends.
  */
 void app_programEnd(void);

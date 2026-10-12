@@ -89,6 +89,41 @@ inline ArmSide oppositeArmSide(ArmSide s) {
 class RobotMTR : public Robot {
    public:
     // Original two-arg constructor retained for backward compatibility (master: has UI hardware)
+struct MTRLinkHitbox {
+    VM2 start;       //!< Centreline start point in the shared workspace [m]
+    VM2 end;         //!< Centreline end point in the shared workspace [m]
+    double radius;   //!< Physical link radius [m]
+    double boundary; //!< Additional collision clearance outside the radius [m]
+};
+
+struct MTRJointHitbox {
+    VM2 center;      //!< Joint centre in the shared workspace [m]
+    double radius;   //!< Physical joint radius [m]
+    double boundary; //!< Additional collision clearance outside the radius [m]
+};
+
+struct MTRFrameHitbox {
+    VM2 center;       //!< Rectangle centre in the shared workspace [m]
+    VM2 halfExtents;  //!< Half-width and half-height in the frame-local axes [m]
+    double yaw;       //!< Rectangle orientation in the shared workspace [rad]
+    double boundary;  //!< Additional clearance around the rectangle [m]
+};
+
+struct MTRCollisionHitboxes {
+    MTRLinkHitbox L1; //!< Primary link from the origin using q1
+    MTRLinkHitbox L2; //!< Primary link from the end of L1 using q2
+    MTRLinkHitbox A;  //!< Parallel link from the origin using q2
+    MTRLinkHitbox B;  //!< Parallel link from the end of A using q1
+    MTRJointHitbox origin;
+    MTRJointHitbox elbowL1L2;
+    MTRJointHitbox elbowAB;
+    MTRJointHitbox endEffector;
+    MTRFrameHitbox frame;
+};
+
+class RobotMTR : public Robot {
+   public:
+    // With no explicit node list, drive_node_ids are loaded from YAML.
     RobotMTR(const std::string &robot_name      = "RobotMTR",
              const std::string &yaml_config_file = "");
 
@@ -143,6 +178,7 @@ class RobotMTR : public Robot {
     bool initialiseNetwork() override;
     bool initialiseInputs()  override;
     void updateRobot()       override;
+    std::size_t probeDriveNodes() const;
 
     // ── Safety ────────────────────────────────────────────────────────────────
     setMovementReturnCode_t safetyCheck();
@@ -153,7 +189,19 @@ class RobotMTR : public Robot {
     void applyCalibration();
     bool isCalibrated() const { return calibrated; }
     void decalibrate()        { calibrated = false; }
+    const VM2 &calibrationPosition() const { return qCalibration; }
     double getTauMax()  const { return tauMax; }
+    bool automaticCalibrationEnabled() const { return automaticCalibrationEnabled_; }
+    const std::vector<int> &configuredDriveNodeIds() const { return driveNodeIds; }
+    const VM2 &calibrationDirection() const { return calibrationDirection_; }
+    const VM2 &calibrationTorque() const { return calibrationTorque_; }
+    bool collisionUsesHitboxes() const { return collisionUseHitboxes_; }
+    double collisionPredictionHorizon() const { return collisionPredictionHorizon_; }
+    double collisionInfluenceDistance() const { return collisionInfluenceDistance_; }
+    double collisionSpringGain() const { return collisionSpringGain_; }
+    double collisionDecayLength() const { return collisionDecayLength_; }
+    double collisionDampingGain() const { return collisionDampingGain_; }
+    bool collisionLogOnly() const { return collisionLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -165,8 +213,18 @@ class RobotMTR : public Robot {
     /** Returns VM2::Zero() — horizontal plane, gravity is perpendicular. */
     VM2 calculateGravityTorques();
 
+    /** Build the four link hitboxes from the current calibrated joint positions. */
+    MTRCollisionHitboxes getCollisionHitboxes() const;
+
+    /** Build the four link hitboxes for a supplied joint configuration. */
+    MTRCollisionHitboxes getCollisionHitboxes(VM2 q) const;
+    VM2 collisionPointVelocity(std::size_t linkIndex, double fraction) const;
+    VM2 collisionPointJointTorque(std::size_t linkIndex, double fraction,
+                                  const VM2 &force) const;
+
     // ── Joint-space setters ───────────────────────────────────────────────────
-    setMovementReturnCode_t setJointTorque(VM2 tau);
+    setMovementReturnCode_t setJointTorque(VM2 tau,
+                                            bool applySingularityDamping = true);
     setMovementReturnCode_t setJointPosition(VM2 q);
     setMovementReturnCode_t setJointVelocity(VM2 dq);
 
@@ -174,6 +232,8 @@ class RobotMTR : public Robot {
     /** τ = Jᵀ·F + τ_friction  (no gravity term — horizontal plane). */
     setMovementReturnCode_t setEndEffForceWithCompensation(VM2 F,
                                                            bool friction_comp = true);
+    setMovementReturnCode_t setEndEffForceWithCompensation(
+        VM2 F, bool friction_comp, const VM2 &collisionPriorityTorque);
 
     // ── State readers (VX for FLNLHelper / CSV logging) ──────────────────────
     const VX &getEndEffPosition();
@@ -195,12 +255,33 @@ class RobotMTR : public Robot {
     double L2             = 0.37;   //!< Distal   link [m]  (MUST VERIFY)
     double parallel_ratio = 1.0;    //!< Joint-2 parallelogram transmission ratio
 
+    // Robot pose and link collision geometry in the shared workspace.
+    double collisionBaseX = 0.0;                 //!< Shoulder x position [m]
+    double collisionBaseY = 0.0;                 //!< Shoulder y position [m]
+    double collisionBaseYaw = 0.0;               //!< Robot base rotation [rad]
+    double collisionLinkThickness = 0.08;        //!< Link diameter [m]
+    double collisionBoundary = 0.02;             //!< Extra clearance [m]
+    double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
+    double collisionJointRadius = 0.05;          //!< Physical joint radius [m]
+    double collisionEndEffectorRadius = 0.12;    //!< End-effector hitbox radius [m] (MUST VERIFY)
+    double collisionFrameCenterX = 0.0;           //!< Frame centre x in base frame [m]
+    double collisionFrameCenterY = 0.0;           //!< Frame centre y in base frame [m]
+    double collisionFrameWidth = 0.60;            //!< Frame width [m]
+    double collisionFrameHeight = 0.40;           //!< Frame height [m]
+    double collisionFrameBoundary = 0.02;         //!< Frame clearance [m]
+
     // Drive envelope — loaded from MTR_params.yaml (these are YAML defaults; YAML overrides at runtime)
     double dqMax        = 200.0 * M_PI / 180.0;  //!< Max JOINT speed  [rad/s] (200 deg/s joint = 3000 deg/s motor)
-    double tauMax       =   20.0;                  //!< Max JOINT torque [N·m]   (3.0 N·m joint = 0.2 N·m motor)
-    double tauSafetyMax =   30.0;                  //!< Measured-torque e-stop [N·m joint]; must be > tauMax
+    double tauMax       =   3.0;                  //!< Max JOINT torque [N·m]   (3.0 N·m joint = 0.2 N·m motor)
+    double tauSafetyMax =   6.0;                  //!< Measured-torque e-stop [N·m joint]; must be > tauMax
+    double qDampingWidth = 10.0 * M_PI / 180.0;   //!< Soft-limit damping band [rad]
+    double qDampingGain  = 0.5;                   //!< Soft-limit viscous gain [N·m·s/rad]
+    double singularityDampingAngleExtended = 15.0 * M_PI / 180.0; //!< Extended singularity band [rad]
+    double singularityDampingAngleFolded   = 15.0 * M_PI / 180.0; //!< Folded singularity band [rad]
+    double singularityDampingGain          = 0.5;                 //!< Singularity viscous gain [N·m·s/rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
+    std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)
     std::vector<double> motorCstt    = {0.114, 0.114};  //!< Maxon EC60 torque constant Kt [N·m/A]
     std::vector<double> qSigns       = {-1.0,   -1.0};   //!< Sign correction (VERIFIED from spin tests)
@@ -227,6 +308,17 @@ class RobotMTR : public Robot {
          -10.0 * M_PI / 180.0,   // θ₁_max hard stop [rad] — overridden by YAML
          140.0 * M_PI / 180.0    // θ₂_min hard stop [rad] — overridden by YAML
     };
+
+        bool automaticCalibrationEnabled_ = false;
+        bool collisionUseHitboxes_ = true;
+        bool collisionLogOnly_ = false;
+        double collisionPredictionHorizon_ = 0.15;
+        double collisionInfluenceDistance_ = 0.15;
+        double collisionSpringGain_ = 0.25;
+        double collisionDecayLength_ = 0.05;
+        double collisionDampingGain_ = 2.0;
+        VM2 calibrationDirection_ = VM2(-1.0, -1.0);
+        VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
     bool calibrated      = false;
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
@@ -281,6 +373,7 @@ class RobotMTR : public Robot {
     setMovementReturnCode_t applyTorque(std::vector<double> torques);
     setMovementReturnCode_t applyPosition(std::vector<double> positions);
     setMovementReturnCode_t applyVelocity(std::vector<double> velocities);
+    VM2 singularityDampingTorque(VM2 q, VM2 dq) const;
 };
 
 #endif  // ROBOTMTR_H

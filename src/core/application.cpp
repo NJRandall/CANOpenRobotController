@@ -10,12 +10,23 @@
  */
 #include "application.h"
 
+#include <string>
+
 //Select state machine to use for this application (can be set in cmake)
 #ifndef STATE_MACHINE_TYPE
 #error "State Machine Type not defined"
 #endif
 
 std::unique_ptr<STATE_MACHINE_TYPE> stateMachine;
+static std::string canInterfaceName;
+
+void app_setCANInterface(const char *interfaceName) {
+    canInterfaceName = interfaceName ? interfaceName : "";
+}
+
+const char *app_getCANInterface() {
+    return canInterfaceName.c_str();
+}
 
 /******************** RUNS BEFORE CO_init() ********************/
 void app_communicationReset(int argc, char *argv[]) {

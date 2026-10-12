@@ -33,6 +33,7 @@ class JointMT : public Joint {
    private:
     const short int sign;
     const double qMin, qMax, dqMin, dqMax, tauMin, tauMax;
+    const double qDampingWidth, qDampingGain;
 
     // Maxon EC60 encoder: 8192 counts per motor revolution (verified on hardware).
     int encoderCounts = 8192;
@@ -58,7 +59,7 @@ class JointMT : public Joint {
     int jointTorqueToDriveUnit(double jointValue) { return (int)(sign * jointValue / (motorTorqueConstant * Ipeak) * 1000.0 / reductionRatio); };
 
    public:
-    JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, Drive *drive = NULL, const std::string& name="");
+    JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, Drive *drive = NULL, const std::string& name="", double q_damping_width = 10.0 * M_PI / 180.0, double q_damping_gain = 0.5);
     ~JointMT();
     /**
      * \brief Check if current velocity and torque are within limits.
