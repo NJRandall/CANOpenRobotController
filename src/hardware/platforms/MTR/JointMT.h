@@ -37,11 +37,11 @@ class JointMT : public Joint {
 
     // Maxon EC60 encoder: 8192 counts per motor revolution (verified on hardware).
     int encoderCounts = 8192;
-    // 1:15 gearbox between motor shaft and joint output.
-    // All conversion functions divide/multiply by reductionRatio so that getPosition(),
-    // getVelocity(), getTorque() return joint-space values and setTorque() accepts
-    // joint torques and internally scales to motor torque.
-    double reductionRatio = 15.0;
+    // Gearbox ratio between motor shaft and joint output (per joint, from MTR_params.yaml
+    // reductionRatios; 15 for the 1:15 gearbox). All conversion functions divide/multiply
+    // by reductionRatio so that getPosition(), getVelocity(), getTorque() return joint-space
+    // values and setTorque() accepts joint torques and internally scales to motor torque.
+    const double reductionRatio;
 
     // Torque scaling: 1000 drive units (DS402 0x6071) = Ipeak × Kt = rated motor torque.
 
@@ -59,7 +59,7 @@ class JointMT : public Joint {
     int jointTorqueToDriveUnit(double jointValue) { return (int)(sign * jointValue / (motorTorqueConstant * Ipeak) * 1000.0 / reductionRatio); };
 
    public:
-    JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, Drive *drive = NULL, const std::string& name="", double q_damping_width = 10.0 * M_PI / 180.0, double q_damping_gain = 0.5);
+    JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, double reduction_ratio = 15.0, Drive *drive = NULL, const std::string& name="", double q_damping_width = 10.0 * M_PI / 180.0, double q_damping_gain = 0.5);
     ~JointMT();
     /**
      * \brief Check if current velocity and torque are within limits.

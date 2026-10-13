@@ -37,6 +37,13 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
         double qmax = qLimits.size() > 2*i+1 ? qLimits[2*i+1] : qLimits[1];
         double iPeak = iPeakDrives.size() > i ? iPeakDrives[i] : iPeakDrives[0];
         double kt = motorCstt.size() > i ? motorCstt[i] : motorCstt[0];
+        double ratio = reductionRatios.size() > i ? reductionRatios[i] : reductionRatios[0];
+        // A wrong ratio silently mis-scales every position, velocity and torque, so refuse to start.
+        if (!(ratio > 0.0) || !std::isfinite(ratio)) {
+            spdlog::critical("RobotMTR {}: reductionRatios[{}] = {} is invalid (must be > 0).",
+                             robot_name, i, ratio);
+            throw std::invalid_argument("RobotMTR: invalid reductionRatios in " + yaml_config_file);
+        }
         short int qsign = qSigns.size() > i ? (short int)qSigns[i] : (short int)qSigns[0];
         std::string jname = "q" + std::to_string(i+1);
         addJoint(new JointMT((int)i,
@@ -44,7 +51,7 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              qsign,
                              -dqMax, dqMax,
                              -tauMax, tauMax,
-                             iPeak, kt,
+                             iPeak, kt, ratio,
                              new CopleyDrive(node), jname,
                              qDampingWidth, qDampingGain));
     }
@@ -218,6 +225,7 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     fillParam(p["qSigns"],       qSigns);
     fillParam(p["iPeakDrives"],  iPeakDrives);
     fillParam(p["motorCstt"],    motorCstt);
+    fillParam(p["reductionRatios"], reductionRatios);
     fillParam(p["frictionVis"],  frictionVis);
     fillParam(p["frictionCoul"], frictionCoul);
 
@@ -382,7 +390,7 @@ VM2 RobotMTR::directKinematic(VM2 q) {
 // ─── Jacobian ─────────────────────────────────────────────────────────────────
 // 2×2 planar Jacobian for parallel linkage (θ₂ absolute).
 // det(J) = L1·L2·sin(θ₂ - θ₁) — zero only at singular configs (arm fully extended/folded).
-// getPosition() returns joint-space radians (reductionRatio=15 applied in JointMT).
+// getPosition() returns joint-space radians (per-joint reductionRatios applied in JointMT).
 Matrix2d RobotMTR::J() {
     double t1 = joints[0]->getPosition();
     double t2 = joints.size() > 1 ? joints[1]->getPosition() : 0.0;
@@ -664,7 +672,7 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
             return OUTSIDE_LIMITS;
         }
         for (unsigned int i = 0; i < joints.size(); i++) {
-            double tau = joints[i]->getTorque();   // joint torque [N·m] — reductionRatio=15 applied
+            double tau = joints[i]->getTorque();   // joint torque [N·m] — reductionRatios applied
             if (tau > tauSafetyMax || tau < -tauSafetyMax) {
                 spdlog::error("MTR: Joint {} measured torque e-stop  tau={:.3f} limit=±{:.3f} N·m",
                               i, tau, tauSafetyMax);
