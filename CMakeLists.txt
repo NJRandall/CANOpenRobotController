@@ -28,7 +28,7 @@ endif()
 #include(../myStateMachineApp/app.cmake) ## example only, need to be defined
 
 ## Comment to use actual hardware, uncomment for a nor robot (virtual) app
-set(NO_ROBOT OFF)
+set(NO_ROBOT ON)
 
 ## Select desired logging level (Options: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, OFF)
 ## INFO is the recommended level in normal operation
