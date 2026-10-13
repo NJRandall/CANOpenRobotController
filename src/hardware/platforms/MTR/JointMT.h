@@ -36,7 +36,7 @@ class JointMT : public Joint {
     const double qDampingWidth, qDampingGain;
 
     // Maxon EC60 encoder: 8192 counts per motor revolution (verified on hardware).
-    int encoderCounts = 8192;
+    int encoderCounts = 4096;
     // Gearbox ratio between motor shaft and joint output (per joint, from MTR_params.yaml
     // reductionRatios; 15 for the 1:15 gearbox). All conversion functions divide/multiply
     // by reductionRatio so that getPosition(), getVelocity(), getTorque() return joint-space

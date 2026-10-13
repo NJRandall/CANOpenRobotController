@@ -11,7 +11,7 @@ project(CORC C CXX)
 
 ### Select the application by setting the state machine app.cmake to use
 include(../MTRobotMachine/app.cmake)
-option(MTR_ENABLE_JOINT_SPIN_TEST "Include the joint spin debugging state" OFF)
+option(MTR_ENABLE_JOINT_SPIN_TEST "Include the joint spin debugging state" ON)
 if(MTR_ENABLE_JOINT_SPIN_TEST)
 	add_definitions(-DMTR_ENABLE_JOINT_SPIN_TEST=1)
 endif()
@@ -28,7 +28,7 @@ endif()
 #include(../myStateMachineApp/app.cmake) ## example only, need to be defined
 
 ## Comment to use actual hardware, uncomment for a nor robot (virtual) app
-set(NO_ROBOT ON)
+set(NO_ROBOT OFF)
 
 ## Select desired logging level (Options: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, OFF)
 ## INFO is the recommended level in normal operation
