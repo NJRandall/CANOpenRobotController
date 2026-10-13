@@ -13,36 +13,38 @@ v1_unit:
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 3.0  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 6.0  # Measured joint torque stop threshold [N*m]
+  tauMax: 20  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Soft-limit damping band [deg]
   qDampingGain: 0.5  # Soft-limit damping gain [N*m*s/rad]
   singularityDampingAngleExtended: 15.0  # Extended singularity damping range [deg]
   singularityDampingAngleFolded: 15.0  # Folded singularity damping range [deg]
   singularityDampingGain: 0.5  # Singularity damping gain [N*m*s/rad]
   collision:
-    base_x: 0.0  # Robot base x position in shared frame [m]
-    base_y: 0.0  # Robot base y position in shared frame [m]
-    base_yaw: 0.0  # Robot base rotation in shared frame [deg]
-    link_thickness: 0.08  # Link diameter [m]
+    base_x: 0.245  # Robot base x position in shared frame [m]
+    base_y: 0.067  # Robot base y position in shared frame [m]
+    base_yaw: 180  # Robot base rotation in shared frame [deg]
+    link_thickness: 0.04  # Link diameter [m]
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.20  # Short parallel-link length [m]
-    joint_radius: 0.02  # Joint collision radius [m]
+    joint_radius: 0.06  # Joint collision radius [m]
     end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
     frame:
-      center_x: 0.0  # Frame center x relative to base [m]
-      center_y: 0.0  # Frame center y relative to base [m]
-      width: 0.60  # Frame width [m]
-      height: 0.40  # Frame height [m]
-      boundary: 0.02  # Frame clearance [m]
+      center_x: 0.246  # Frame center x relative to base [m]
+      center_y: 0.1175  # Frame center y relative to base [m]
+      width: 0.49  # Frame width [m]
+      height: 0.235  # Frame height [m]
+      boundary: 0.05  # Frame clearance [m]
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
+  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
+  calibration_direction: [1, 1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
-  qLimits: [-360, 360, -360, 360]  # Joint 0 and joint 1 angle limits [deg]
-  qCalibration: [0, 0]  # Joint 0 and joint 1 calibration angles [deg]
+  qLimits: [-160, 12, -235, -14]  # Joint 0 and joint 1 angle limits [deg]
+  qCalibration: [9, -16]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
@@ -53,36 +55,38 @@ v2_unit:
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 3.0  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 6.0  # Measured joint torque stop threshold [N*m]
+  tauMax: 30  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Soft-limit damping band [deg]
   qDampingGain: 0.5  # Soft-limit damping gain [N*m*s/rad]
   singularityDampingAngleExtended: 15.0  # Extended singularity damping range [deg]
   singularityDampingAngleFolded: 15.0  # Folded singularity damping range [deg]
   singularityDampingGain: 0.5  # Singularity damping gain [N*m*s/rad]
   collision:
-    base_x: 0.0  # Robot base x position in shared frame [m]
-    base_y: 0.0  # Robot base y position in shared frame [m]
+    base_x: 0.25  # Robot base x position in shared frame [m]
+    base_y: 0.0675  # Robot base y position in shared frame [m]
     base_yaw: 0.0  # Robot base rotation in shared frame [deg]
-    link_thickness: 0.08  # Link diameter [m]
+    link_thickness: 0.03  # Link diameter [m]
     boundary: 0.02  # Link clearance [m]
-    link_A_length: 0.20  # Short parallel-link length [m]
-    joint_radius: 0.02  # Joint collision radius [m]
+    link_A_length: 0.195  # Short parallel-link length [m]
+    joint_radius: 0.03  # Joint collision radius [m]
     end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
     frame:
-      center_x: 0.0  # Frame center x relative to base [m]
-      center_y: 0.0  # Frame center y relative to base [m]
-      width: 0.60  # Frame width [m]
-      height: 0.40  # Frame height [m]
-      boundary: 0.02  # Frame clearance [m]
-  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
+      center_x: 0.246  # Frame center x relative to base [m]
+      center_y: 0.1175  # Frame center y relative to base [m]
+      width: 0.49  # Frame width [m]
+      height: 0.235  # Frame height [m]
+      boundary: 0.05  # Frame clearance [m]
+  iPeakDrives: [12,12]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
+  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
+  calibration_direction: [1, 1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
-  qLimits: [-360, 360, -360, 360]  # Joint 0 and joint 1 angle limits [deg]
-  qCalibration: [0, 0]  # Joint 0 and joint 1 calibration angles [deg]
+  qLimits: [-160, 17, -235, -8]  # Joint 0 and joint 1 angle limits [deg]
+  qCalibration: [15.7, -9.3]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
