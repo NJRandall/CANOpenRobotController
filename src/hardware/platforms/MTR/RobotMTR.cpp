@@ -291,7 +291,7 @@ bool RobotMTR::initialiseInputs() {
 std::size_t RobotMTR::probeDriveNodes() const {
     std::size_t responsiveNodes = 0;
     for (const Joint *joint : joints) {
-        if (joint->drive && joint->drive->SDORead())
+        if (joint && joint->getDrive() && joint->getDrive()->SDORead())
             ++responsiveNodes;
     }
     return responsiveNodes;
