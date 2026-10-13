@@ -1,12 +1,13 @@
 #include "JointMT.h"
 
 
-JointMT::JointMT(int jointID, double q_min, double q_max, short int sign_, double dq_min, double dq_max, double tau_min, double tau_max, double ipeak, double motor_kt, Drive *drive, const std::string& name, double q_damping_width, double q_damping_gain) :   Joint(jointID, q_min, q_max, drive, name),
+JointMT::JointMT(int jointID, double q_min, double q_max, short int sign_, double dq_min, double dq_max, double tau_min, double tau_max, double ipeak, double motor_kt, double reduction_ratio, Drive *drive, const std::string& name, double q_damping_width, double q_damping_gain) :   Joint(jointID, q_min, q_max, drive, name),
                                                                                                                                                                 sign(sign_),
                                                                                                                                                                 qMin(q_min), qMax(q_max),
                                                                                                                                                                 dqMin(dq_min), dqMax(dq_max),
                                                                                                                                                                 tauMin(tau_min), tauMax(tau_max),
                                                                                                                                                                 qDampingWidth(q_damping_width), qDampingGain(q_damping_gain),
+                                                                                                                                                                reductionRatio(reduction_ratio),
                                                                                                                                                                 Ipeak(ipeak),
                                                                                                                                                                 motorTorqueConstant(motor_kt)
                                                                                                                                                                 {

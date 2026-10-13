@@ -39,6 +39,9 @@ v1_unit:
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
   qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [1, 1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
+  qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-160, 12, -235, -14]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [9, -16]  # Joint 0 and joint 1 calibration angles [deg]
@@ -78,6 +81,9 @@ v2_unit:
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
   qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [1, 1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
+  qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-160, 17, -235, -8]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [15.7, -9.3]  # Joint 0 and joint 1 calibration angles [deg]
