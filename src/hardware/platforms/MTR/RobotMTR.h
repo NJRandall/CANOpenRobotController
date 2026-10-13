@@ -39,7 +39,8 @@
  *   2 × Copley ACK-055-06 drives on CAN bus (node IDs 1 and 3), each driving a
  *   Maxon EC60 BLDC motor through a 1:15 gearbox.
  *   VERIFIED: 0x6076 (Motor Rated Torque) = 319 mN·m = 2.795 A × 0.114 N·m/A.
- *   JointMT applies reductionRatio=15 so all joint-level values are in output-shaft
+ *   JointMT applies the per-joint reductionRatios from MTR_params.yaml (15 by default)
+ *   so all joint-level values are in output-shaft
  *   units: positions [rad], velocities [rad/s], torques [N·m at joint].
  *
  * Workspace joint limits (System Modelling/ROM (1).m, accelCalc (1).m)
@@ -85,10 +86,6 @@ inline ArmSide oppositeArmSide(ArmSide s) {
     return ArmSide::UNKNOWN;
 }
 
-
-class RobotMTR : public Robot {
-   public:
-    // Original two-arg constructor retained for backward compatibility (master: has UI hardware)
 struct MTRLinkHitbox {
     VM2 start;       //!< Centreline start point in the shared workspace [m]
     VM2 end;         //!< Centreline end point in the shared workspace [m]
@@ -284,6 +281,7 @@ class RobotMTR : public Robot {
     std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)
     std::vector<double> motorCstt    = {0.114, 0.114};  //!< Maxon EC60 torque constant Kt [N·m/A]
+    std::vector<double> reductionRatios = {15.0, 15.0}; //!< Gearbox ratio motor:joint (1:15)
     std::vector<double> qSigns       = {-1.0,   -1.0};   //!< Sign correction (VERIFIED from spin tests)
 
     // Friction model — zero until system identification; see MTR_params.yaml

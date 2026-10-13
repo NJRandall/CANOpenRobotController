@@ -37,6 +37,7 @@ v1_unit:
       boundary: 0.02  # Frame clearance [m]
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
+  reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
@@ -76,6 +77,7 @@ v2_unit:
       boundary: 0.02  # Frame clearance [m]
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
+  reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY

@@ -405,6 +405,11 @@ class Joint: public CANDevice {
     int getDriveStatus() { return drive->getStatus(); }
 
     /**
+     * \brief Access the associated drive object (if actuated)
+     */
+    Drive *getDrive() const { return drive; }
+
+    /**
          * \brief Start the associated drive CAN node (will start produce PDOs)
          *
          * \return Return value of drive->start();
