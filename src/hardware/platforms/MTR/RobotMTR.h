@@ -63,7 +63,8 @@
 #include "Keyboard.h"       // Keyboard input (development / fallback)
 #include "RotaryEncoder.h"  // KY-040 rotary encoder with push button
 #include "LCD1602.h"        // 16×2 LCD via PCF8574 I2C backpack
-#include "I2CMPU6050IMU.h"  // MPU-6050 IMU — device orientation (Left/Right) detection
+// IMU disabled — not in use for now. Uncomment to re-enable.
+// #include "I2CMPU6050IMU.h"  // MPU-6050 IMU — device orientation (Left/Right) detection
 #include "USBMouse.h"       // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR
 #include "Robot.h"          // CORC Robot base class
 #include "CopleyDrive.h"    // Copley drive interface
@@ -325,17 +326,18 @@ class RobotMTR : public Robot {
     bool isLeader_        = false; // bimanual control role — see isLeader() above
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
-    I2CMPU6050IMU *imu = nullptr;   // master only — see armSide() comment above
+    // IMU disabled — not in use for now. Uncomment to re-enable.
+    // I2CMPU6050IMU *imu = nullptr;   // master only — see armSide() comment above
     ArmSide armSide_             = ArmSide::UNKNOWN;
-    double  armSideAxisFiltered_ = 0.0;   // low-pass filtered "up axis" reading [m/s^2]
+    // double  armSideAxisFiltered_ = 0.0;   // low-pass filtered "up axis" reading [m/s^2]
 
-    /**
-     * \brief Read the IMU, low-pass filter it, and update armSide_ via a dead-zone
-     * (Schmitt-trigger) decision. No-op if imu is null (listener / no IMU).
-     * Called every updateRobot() cycle — this is a filtered read + comparison, not a
-     * safety check, so there's no reason to throttle it.
-     */
-    void updateArmSide();
+    // /**
+     // * \brief Read the IMU, low-pass filter it, and update armSide_ via a dead-zone
+     // * (Schmitt-trigger) decision. No-op if imu is null (listener / no IMU).
+     // * Called every updateRobot() cycle — this is a filtered read + comparison, not a
+     // * safety check, so there's no reason to throttle it.
+     // */
+    // void updateArmSide();
 
     // ── Drive liveness ─────────────────────────────────────────────────────────
     // Periodic check that each drive node still answers on the CAN bus. A non-responding
@@ -348,7 +350,7 @@ class RobotMTR : public Robot {
     static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
                                                        // SDO round-trips are slow/blocking,
                                                        // unlike the PDO-based control traffic
-    bool checkDriveAlive(int nodeID);
+    static bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
     double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]
