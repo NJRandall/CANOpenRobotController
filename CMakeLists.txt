@@ -11,7 +11,7 @@ project(CORC C CXX)
 
 ### Select the application by setting the state machine app.cmake to use
 include(../MTRobotMachine/app.cmake)
-option(MTR_ENABLE_JOINT_SPIN_TEST "Include the joint spin debugging state" ON)
+option(MTR_ENABLE_JOINT_SPIN_TEST "Include the joint spin debugging state" OFF)
 if(MTR_ENABLE_JOINT_SPIN_TEST)
 	add_definitions(-DMTR_ENABLE_JOINT_SPIN_TEST=1)
 endif()
