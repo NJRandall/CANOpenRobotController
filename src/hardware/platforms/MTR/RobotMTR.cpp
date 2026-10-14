@@ -45,6 +45,12 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              robot_name, i, ratio);
             throw std::invalid_argument("RobotMTR: invalid reductionRatios in " + yaml_config_file);
         }
+        int counts = (int)(encoderCounts.size() > i ? encoderCounts[i] : encoderCounts[0]);
+        if (counts <= 0) {
+            spdlog::critical("RobotMTR {}: encoderCounts[{}] = {} is invalid (must be > 0).",
+                             robot_name, i, counts);
+            throw std::invalid_argument("RobotMTR: invalid encoderCounts in " + yaml_config_file);
+        }
         short int qsign = qSigns.size() > i ? (short int)qSigns[i] : (short int)qSigns[0];
         std::string jname = "q" + std::to_string(i+1);
         addJoint(new JointMT((int)i,
@@ -54,7 +60,7 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              -tauMax, tauMax,
                              iPeak, kt, ratio,
                              new CopleyDrive(node), jname,
-                             qDampingWidth, qDampingGain));
+                             qDampingWidth, qDampingGain, counts));
     }
 
     // UI hardware (keyboard/encoder/LCD) is master-only: a non-master unit has none of
@@ -66,9 +72,17 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
         // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
         addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
 
-        // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2
-        lcd = new LCD1602(0x27, 2);
-        lcd->init();
+        // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2. There is one physical LCD per
+        // BeagleBone, so every unit on this board shares one LCD1602 object (and its single
+        // flush thread). Two objects would interleave half-byte writes and garble the display.
+        static std::weak_ptr<LCD1602> sharedLcd;
+        lcdOwner_ = sharedLcd.lock();
+        if (!lcdOwner_) {
+            lcdOwner_ = std::make_shared<LCD1602>(0x27, 2);
+            lcdOwner_->init();
+            sharedLcd = lcdOwner_;
+        }
+        lcd = lcdOwner_.get();
 
         // IMU disabled — not in use for now. Uncomment to re-enable.
         // // MPU-6050 IMU for Left/Right orientation detection — master only (see armSide()
@@ -95,7 +109,7 @@ RobotMTR::~RobotMTR() {
     joints.clear();
     delete keyboard;
     delete encoder;
-    delete lcd;
+    lcd = nullptr;   // shared LCD is released by lcdOwner_ when the last unit goes
     // delete imu;
     delete mouse;
     inputs.clear();
@@ -228,6 +242,7 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     fillParam(p["iPeakDrives"],  iPeakDrives);
     fillParam(p["motorCstt"],    motorCstt);
     fillParam(p["reductionRatios"], reductionRatios);
+    fillParam(p["encoderCounts"], encoderCounts);
     fillParam(p["frictionVis"],  frictionVis);
     fillParam(p["frictionCoul"], frictionCoul);
 
@@ -614,6 +629,35 @@ bool RobotMTR::checkDriveAlive(int nodeID) {
 #endif
 }
 
+
+// Bring-up aid: reads the registers that decide whether a drive obeys CANopen torque commands.
+void RobotMTR::printDriveDiagnostics() {
+#ifndef NOROBOT
+    static const std::vector<std::pair<std::string, std::string>> regs = {
+        {"0x2300 0 i16",  "desired state (Copley; CANopen control = 30)"},
+        {"0x6060 0 i8",   "mode of operation (torque = 4)"},
+        {"0x6061 0 i8",   "mode display (torque = 4)"},
+        {"0x6041 0 u16",  "status word (enabled = 0x..37)"},
+        {"0x2183 0 u32",  "latched fault (Copley)"},
+        {"0x1002 0 u32",  "event status (Copley)"},
+        {"0x6076 0 u32",  "rated torque (scale of 0x6071)"},
+        {"0x6072 0 u16",  "max torque [per mille]"},
+        {"0x6071 0 i16",  "target torque [per mille]"},
+        {"0x6077 0 i16",  "actual torque [per mille]"},
+    };
+    for (int node : driveNodeIds_) {
+        spdlog::info("MTR drive diagnostics, node {}:", node);
+        for (const auto &r : regs) {
+            std::string cmd = "[1] " + std::to_string(node) + " read " + r.first;
+            char returnMessage[STRING_BUFFER_SIZE];
+            cancomm_socketFree(const_cast<char *>(cmd.c_str()), returnMessage);
+            std::string reply(returnMessage);
+            while (!reply.empty() && (reply.back() == '\n' || reply.back() == '\r')) reply.pop_back();
+            spdlog::info("  {:<14} {:<45} -> {}", r.first, r.second, reply);
+        }
+    }
+#endif
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Device orientation (Left/Right)
