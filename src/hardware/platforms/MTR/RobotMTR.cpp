@@ -153,6 +153,16 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (params["collision_damping_gain"])
         collisionDampingGain_ = max(0., params["collision_damping_gain"].as<double>());
 
+    // Left/Right mounting — set directly from YAML while IMU-based detection stays
+    // disabled (see RobotMTR.h); swap "L"/"R" here if the physical setup changes.
+    if (p["arm_side"]) {
+        const std::string side = p["arm_side"].as<std::string>();
+        if (side == "L" || side == "LEFT")       armSide_ = ArmSide::LEFT;
+        else if (side == "R" || side == "RIGHT") armSide_ = ArmSide::RIGHT;
+        else spdlog::warn("RobotMTR: Unrecognised arm_side '{}' for '{}'; leaving UNKNOWN.",
+                           side, robotName);
+    }
+
     // Geometry — loaded from YAML so that tuning never requires a recompile
     if (p["L1"])             L1             = p["L1"].as<double>();
     if (p["L2"])             L2             = p["L2"].as<double>();
