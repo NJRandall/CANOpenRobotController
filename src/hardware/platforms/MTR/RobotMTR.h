@@ -137,6 +137,11 @@ class RobotMTR : public Robot {
     ~RobotMTR();
 
     bool isMaster() const { return isMaster_; }
+    const std::string &getName() const { return robotName; }   //!< YAML unit name, e.g. "v1_unit"
+
+    // Stop this unit reading the shared keyboard/encoder/mouse, so they are updated once per
+    // cycle by the unit that owns the UI (active robot 0). The shared LCD is kept for display.
+    void releaseUserInputs();
 
     Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
     RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
@@ -327,6 +332,9 @@ class RobotMTR : public Robot {
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
     std::shared_ptr<LCD1602> lcdOwner_;   // keeps the shared LCD alive while this unit exists
+    std::shared_ptr<Keyboard> keyboardOwner_;     // shared UI inputs, one object per board
+    std::shared_ptr<RotaryEncoder> encoderOwner_;
+    std::shared_ptr<USBMouse> mouseOwner_;
     bool isMaster_        = true; // true: constructs keyboard/encoder/lcd/imu; false: CAN-only listener
     bool isLeader_        = false; // bimanual control role — see isLeader() above
 
