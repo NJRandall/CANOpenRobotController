@@ -62,6 +62,7 @@
 #include "JointMT.h"        // Copley-drive-backed joint
 #include "Keyboard.h"       // Keyboard input (development / fallback)
 #include "RotaryEncoder.h"  // KY-040 rotary encoder with push button
+#include <memory>
 #include "LCD1602.h"        // 16×2 LCD via PCF8574 I2C backpack
 // IMU disabled — not in use for now. Uncomment to re-enable.
 // #include "I2CMPU6050IMU.h"  // MPU-6050 IMU — device orientation (Left/Right) detection
@@ -136,10 +137,15 @@ class RobotMTR : public Robot {
     ~RobotMTR();
 
     bool isMaster() const { return isMaster_; }
+    const std::string &getName() const { return robotName; }   //!< YAML unit name, e.g. "v1_unit"
+
+    // Stop this unit reading the shared keyboard/encoder/mouse, so they are updated once per
+    // cycle by the unit that owns the UI (active robot 0). The shared LCD is kept for display.
+    void releaseUserInputs();
 
     Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
     RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
-    LCD1602       *lcd      = nullptr;  //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27) — master only
+    LCD1602       *lcd      = nullptr;  //!< 16×2 I2C LCD (SDA=P9_20, SCL=P9_19, addr=0x27) — master only; one object shared by all units on this board
     USBMouse      *mouse    = nullptr;  //!< Optional local USB mouse (/dev/input/mouse0) — master only
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
@@ -170,6 +176,8 @@ class RobotMTR : public Robot {
     bool initTorqueControl()   override;
     bool initPositionControl() override;
     bool initVelocityControl() override;
+    int  getJointDriveStatus(unsigned int i) const { return i < joints.size() ? joints[i]->getDriveStatus() : -1; }
+    void printDriveDiagnostics();   //!< SDO-read and print key DS402/Copley registers of every drive
 
     // ── CORC pure-virtual interface ───────────────────────────────────────────
     bool initialiseJoints()  override;
@@ -283,6 +291,7 @@ class RobotMTR : public Robot {
     std::vector<double> iPeakDrives  = {2.795, 2.795};  //!< Maxon EC60 rated current [A]  (VERIFIED)
     std::vector<double> motorCstt    = {0.114, 0.114};  //!< Maxon EC60 torque constant Kt [N·m/A]
     std::vector<double> reductionRatios = {15.0, 15.0}; //!< Gearbox ratio motor:joint (1:15)
+    std::vector<double> encoderCounts   = {4096, 4096}; //!< Encoder counts per motor revolution
     std::vector<double> qSigns       = {-1.0,   -1.0};   //!< Sign correction (VERIFIED from spin tests)
 
     // Friction model — zero until system identification; see MTR_params.yaml
@@ -322,6 +331,10 @@ class RobotMTR : public Robot {
     bool calibrated      = false;
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
+    std::shared_ptr<LCD1602> lcdOwner_;   // keeps the shared LCD alive while this unit exists
+    std::shared_ptr<Keyboard> keyboardOwner_;     // shared UI inputs, one object per board
+    std::shared_ptr<RotaryEncoder> encoderOwner_;
+    std::shared_ptr<USBMouse> mouseOwner_;
     bool isMaster_        = true; // true: constructs keyboard/encoder/lcd/imu; false: CAN-only listener
     bool isLeader_        = false; // bimanual control role — see isLeader() above
 

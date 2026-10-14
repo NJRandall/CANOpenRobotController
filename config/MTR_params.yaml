@@ -38,7 +38,8 @@ v1_unit:
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
   qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections
-  reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
+  reductionRatios: [13.3, 13.3]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
+  encoderCounts: [2048*4, 2048*4]  # Joint 0 and joint 1 encoder counts per motor revolution
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
@@ -76,10 +77,11 @@ v2_unit:
       width: 0.49  # Frame width [m]
       height: 0.235  # Frame height [m]
       boundary: 0.05  # Frame clearance [m]
-  iPeakDrives: [12,12]  # Joint 0 and joint 1 peak current limits [A]
+  iPeakDrives: [4.091, 4.091]  # Rated (CME2 continuous) current [A]: 1000 drive units = 0x6076 (0.945 N*m) / motorCstt
   motorCstt: [0.231, 0.231]  # Joint 0 and joint 1 motor torque constants [N*m/A]
-  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
-  reductionRatios: [15.0, 15.0]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
+  qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections
+  reductionRatios: [11.083, 11.083]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
+  encoderCounts: [4096*4, 4096*4]  # Joint 0 and joint 1 encoder counts per motor revolution
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY

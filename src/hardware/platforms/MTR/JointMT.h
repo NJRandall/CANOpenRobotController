@@ -35,8 +35,8 @@ class JointMT : public Joint {
     const double qMin, qMax, dqMin, dqMax, tauMin, tauMax;
     const double qDampingWidth, qDampingGain;
 
-    // Maxon EC60 encoder: 8192 counts per motor revolution (verified on hardware).
-    int encoderCounts = 4096;
+    // Encoder counts per motor revolution as reported by the drive (encoderCounts in MTR_params.yaml).
+    const int encoderCounts;
     // Gearbox ratio between motor shaft and joint output (per joint, from MTR_params.yaml
     // reductionRatios; 15 for the 1:15 gearbox). All conversion functions divide/multiply
     // by reductionRatio so that getPosition(), getVelocity(), getTorque() return joint-space
@@ -59,7 +59,7 @@ class JointMT : public Joint {
     int jointTorqueToDriveUnit(double jointValue) { return (int)(sign * jointValue / (motorTorqueConstant * Ipeak) * 1000.0 / reductionRatio); };
 
    public:
-    JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, double reduction_ratio = 15.0, Drive *drive = NULL, const std::string& name="", double q_damping_width = 10.0 * M_PI / 180.0, double q_damping_gain = 0.5);
+    JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, double reduction_ratio = 15.0, Drive *drive = NULL, const std::string& name="", double q_damping_width = 10.0 * M_PI / 180.0, double q_damping_gain = 0.5, int encoder_counts = 4096);
     ~JointMT();
     /**
      * \brief Check if current velocity and torque are within limits.
