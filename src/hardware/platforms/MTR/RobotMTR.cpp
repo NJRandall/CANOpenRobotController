@@ -672,6 +672,13 @@ void RobotMTR::printDriveDiagnostics() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Device orientation (Left/Right)
 // ═══════════════════════════════════════════════════════════════════════════════
+//
+// Left vs Right is a physical 180° flip of the housing (chip facing up vs down) —
+// not a yaw rotation, which gravity sensing can't detect at all. It's the same flip
+// that gives collisionBaseYaw its 0°/180° values for the collision frame, though
+// that's a separate, YAML-configured fact about the shared workspace frame, not
+// something read from the IMU. armSide_ is currently set from arm_side in
+// MTR_params.yaml (see loadParametersFromYAML()) while the IMU stays disabled.
 
 // IMU disabled — not in use for now. Uncomment to re-enable.
 // void RobotMTR::updateArmSide() {
@@ -680,7 +687,7 @@ void RobotMTR::printDriveDiagnostics() {
     // // TODO: confirm which IMU axis reads "up" when the device is mounted upright — this is a
     // // fixed mechanical fact (how the MPU-6050 board sits inside the housing), not something
     // // derivable at runtime, so it can't be left auto-detecting. To find it: hold the device in
-    // // its intended "upright/Left" orientation, print imu->getAcc(), and see which axis reads
+    // // its intended ArmSide::LEFT orientation, print imu->getAcc(), and see which axis reads
     // // close to +9.81 m/s^2. Then pick the matching line below (only one should be uncommented).
     // double upAxisRaw = imu->getAcc()[2];   // TODO (placeholder): Z axis, default orientation
     // // double upAxisRaw = imu->getAcc()[0];   // TODO option: X axis, default orientation
@@ -693,9 +700,9 @@ void RobotMTR::printDriveDiagnostics() {
     // const double alpha = 0.01;   // TODO: tune — smaller = more smoothing, slower to respond
     // armSideAxisFiltered_ += alpha * (upAxisRaw - armSideAxisFiltered_);
 
-    // // Dead-zone (Schmitt-trigger) decision: upright (~+1g on the up axis) -> LEFT,
-    // // flipped 180° (~-1g) -> RIGHT. The dead zone is the band of tilt angles around the 90°
-    // // boundary where we deliberately do NOT commit to either side, so mounting slop or
+    // // Dead-zone (Schmitt-trigger) decision: upright (~+1g on the up axis) -> ArmSide::LEFT,
+    // // flipped 180° (~-1g) -> ArmSide::RIGHT. The dead zone is the band of tilt angles around
+    // // the 90° boundary where we deliberately do NOT commit to either side, so mounting slop or
     // // vibration near the boundary can't cause a spurious decision. The housing is rigid (can
     // // only physically sit at ~0° or ~180°), so this margin only needs to cover mounting
     // // tolerance, not a genuinely ambiguous resting angle — kept tight for a fast, confident
