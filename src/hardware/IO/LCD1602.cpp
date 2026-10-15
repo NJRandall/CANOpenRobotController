@@ -144,6 +144,11 @@ void LCD1602::printChar(char c) {
     }
 }
 
+char LCD1602::charAt(uint8_t col, uint8_t row) {
+    std::lock_guard<std::mutex> lock(bufMutex_);
+    return buffer_[row & 0x1][col < 16 ? col : 15];
+}
+
 void LCD1602::print(const char *str) {
     std::lock_guard<std::mutex> lock(bufMutex_);
     while (*str && curCol_ < 16) {

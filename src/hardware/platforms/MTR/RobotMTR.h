@@ -280,9 +280,6 @@ class RobotMTR : public Robot {
     Eigen::Matrix2d taskRotation_ = Eigen::Matrix2d::Identity();  //!< Local → shared axes (may mirror)
 
     // Robot pose and link collision geometry in the shared workspace.
-    double collisionBaseX = 0.0;                 //!< Shoulder x position [m]
-    double collisionBaseY = 0.0;                 //!< Shoulder y position [m]
-    double collisionBaseYaw = 0.0;               //!< Robot base rotation [rad]
     double collisionLinkThickness = 0.08;        //!< Link diameter [m]
     double collisionBoundary = 0.02;             //!< Extra clearance [m]
     double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
@@ -303,6 +300,11 @@ class RobotMTR : public Robot {
     double singularityDampingAngleExtended = 15.0 * M_PI / 180.0; //!< Extended singularity band [rad]
     double singularityDampingAngleFolded   = 15.0 * M_PI / 180.0; //!< Folded singularity band [rad]
     double singularityDampingGain          = 0.5;                 //!< Singularity viscous gain [N·m·s/rad]
+    // Elbow angles (q2 - q1) of the mechanical stops that keep the elbow off its singularities.
+    // Each damping band ramps from zero at (stop ± band) to full gain at the stop. The defaults
+    // are the singularities themselves (0 and 180 deg).
+    double singularityExtendedStop         = 0.0;                 //!< Extended elbow stop [rad]
+    double singularityFoldedStop           = M_PI;                //!< Folded elbow stop [rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
     std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint

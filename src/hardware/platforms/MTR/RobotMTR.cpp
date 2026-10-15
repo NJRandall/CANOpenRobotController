@@ -276,13 +276,20 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         singularityDampingAngleFolded = max(0., p["singularityDampingAngleFolded"].as<double>()) * M_PI / 180.;
     if (p["singularityDampingGain"])
         singularityDampingGain = max(0., p["singularityDampingGain"].as<double>());
+    if (p["singularityExtendedStop"])
+        singularityExtendedStop = std::clamp(p["singularityExtendedStop"].as<double>(), 0., 180.) * M_PI / 180.;
+    if (p["singularityFoldedStop"])
+        singularityFoldedStop = std::clamp(p["singularityFoldedStop"].as<double>(), 0., 180.) * M_PI / 180.;
+    if (singularityExtendedStop >= singularityFoldedStop)
+        throw std::invalid_argument("RobotMTR: singularityExtendedStop must be below singularityFoldedStop");
 
     YAML::Node collision = p["collision"];
     if (collision) {
-        if (collision["base_x"]) collisionBaseX = collision["base_x"].as<double>();
-        if (collision["base_y"]) collisionBaseY = collision["base_y"].as<double>();
-        if (collision["base_yaw"])
-            collisionBaseYaw = collision["base_yaw"].as<double>() * M_PI / 180.;
+        // Placement comes from task_origin / task_mirror_x / task_yaw; the old per-unit
+        // collision base_x / base_y / base_yaw keys are no longer used.
+        if (collision["base_x"] || collision["base_y"] || collision["base_yaw"])
+            spdlog::warn("RobotMTR {}: collision base_x/base_y/base_yaw are ignored; "
+                         "collision geometry uses task_origin/task_mirror_x/task_yaw.", robotName);
         if (collision["link_thickness"])
             collisionLinkThickness = max(0., collision["link_thickness"].as<double>());
         if (collision["boundary"])
@@ -505,12 +512,10 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes() const {
 }
 
 MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
-    double c = std::cos(collisionBaseYaw);
-    double s = std::sin(collisionBaseYaw);
-    auto toWorkspace = [this, c, s](VM2 localPoint) {
-        return VM2(c * localPoint[0] - s * localPoint[1] + collisionBaseX,
-                   s * localPoint[0] + c * localPoint[1] + collisionBaseY);
-    };
+    // Hitboxes live in the shared task frame (task_origin / task_mirror_x / task_yaw), the same
+    // frame as the end-effector positions, so both units' geometry is placed consistently.
+    auto toWorkspace = [this](VM2 localPoint) { return toTaskFrame(localPoint); };
+    const double frameYaw = std::atan2(taskRotation_(1, 0), taskRotation_(0, 0));
 
     // q is expressed relative to this robot's base. The primary chain is
     // origin -> L1 -> L2, while the parallel chain is origin -> A -> B.
@@ -535,7 +540,7 @@ MTRCollisionHitboxes RobotMTR::getCollisionHitboxes(VM2 q) const {
         {toWorkspace(endL2), collisionEndEffectorRadius, collisionBoundary},
         {toWorkspace(frameCenterLocal),
          VM2(0.5 * collisionFrameWidth, 0.5 * collisionFrameHeight),
-         collisionBaseYaw,
+         frameYaw,
          collisionFrameBoundary}
     };
 }
@@ -561,10 +566,7 @@ VM2 RobotMTR::collisionPointVelocity(std::size_t linkIndex, double fraction) con
     case 4: localVelocity = L1 * dq1 * tangent1 + L2 * dq2 * tangent2; break;
     }
 
-    const double cosine = std::cos(collisionBaseYaw);
-    const double sine = std::sin(collisionBaseYaw);
-    return VM2(cosine * localVelocity.x() - sine * localVelocity.y(),
-               sine * localVelocity.x() + cosine * localVelocity.y());
+    return toTaskVector(localVelocity);
 }
 
 VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
@@ -600,14 +602,9 @@ VM2 RobotMTR::collisionPointJointTorque(std::size_t linkIndex, double fraction,
         break;
     }
 
-    const double cosine = std::cos(collisionBaseYaw);
-    const double sine = std::sin(collisionBaseYaw);
-    auto rotate = [cosine, sine](const VM2 &vector) {
-        return VM2(cosine * vector.x() - sine * vector.y(),
-                   sine * vector.x() + cosine * vector.y());
-    };
-    return VM2(rotate(jacobianColumn1).dot(force),
-               rotate(jacobianColumn2).dot(force));
+    // force is in the task frame; map each local Jacobian column into it.
+    return VM2(toTaskVector(jacobianColumn1).dot(force),
+               toTaskVector(jacobianColumn2).dot(force));
 }
 
 
@@ -851,22 +848,21 @@ VM2 RobotMTR::singularityDampingTorque(VM2 q, VM2 dq) const {
     // Wrap the relative angle so equivalent configurations use one common range.
     double wrappedDelta = std::atan2(std::sin(delta), std::cos(delta));
 
-    // Select the nearer singularity branch: zero for extended, +/- pi for folded.
-    bool approachingExtended = std::abs(wrappedDelta) <= M_PI / 2.0;
-
-    // Measure the shortest angular distance to the selected singularity.
-    double distance = approachingExtended
-                    ? std::abs(wrappedDelta)
-                    : M_PI - std::abs(wrappedDelta);
+    // Distance to the elbow stops that guard each singularity (negative once past a stop).
+    // Select the nearer one.
+    double extendedDistance = std::abs(wrappedDelta) - singularityExtendedStop;
+    double foldedDistance = singularityFoldedStop - std::abs(wrappedDelta);
+    bool approachingExtended = extendedDistance <= foldedDistance;
+    double distance = approachingExtended ? extendedDistance : foldedDistance;
 
     // Extended and folded configurations can use different activation bands.
     double dampingAngle = approachingExtended
                         ? singularityDampingAngleExtended
                         : singularityDampingAngleFolded;
 
-    // Outside the band there is no damping; the exact singularity is left to
-    // the mechanical stop rather than creating a direction ambiguity here.
-    if (dampingAngle <= 0.0 || distance >= dampingAngle || distance < 1e-9)
+    // Outside the band there is no damping. At the exact straight pose the direction is
+    // ambiguous; the mechanical stop keeps the elbow away from it.
+    if (dampingAngle <= 0.0 || distance >= dampingAngle || std::abs(wrappedDelta) < 1e-9)
         return VM2::Zero();
 
     // This gradient points toward increasing distance from the selected singularity.
@@ -880,8 +876,8 @@ VM2 RobotMTR::singularityDampingTorque(VM2 q, VM2 dq) const {
     if (distanceRate >= 0.0)
         return VM2::Zero();
 
-    // Ramp damping smoothly from zero at the band edge to full gain at the stop.
-    double activation = 1.0 - distance / dampingAngle;
+    // Ramp damping smoothly from zero at the band edge to full gain at the stop (and beyond).
+    double activation = std::min(1.0, 1.0 - distance / dampingAngle);
 
     // Viscous damping opposes approach velocity; it does not create a spring force.
     return -singularityDampingGain * activation * distanceRate * gradient;
