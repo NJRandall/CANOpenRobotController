@@ -6,7 +6,7 @@
  * The mouse reports relative motion only — there is no absolute position. This class
  * integrates the deltas into a running 2D position in metres, with an arbitrary origin
  * (wherever the mouse was at construction). Callers needing a reference relative to some
- * other origin (e.g. UniControllerState's X_init) capture their own baseline from
+ * other origin (e.g. UniControlState's X_init) capture their own baseline from
  * getPosition() and subtract it — the same pattern already used for the GUI mouse command.
  *
  * Node path and permissions: /dev/input/mouseN requires read access (root, or membership

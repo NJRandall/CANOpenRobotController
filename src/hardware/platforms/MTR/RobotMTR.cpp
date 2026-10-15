@@ -152,6 +152,10 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         collisionDecayLength_ = max(1e-6, params["collision_decay_length"].as<double>());
     if (params["collision_damping_gain"])
         collisionDampingGain_ = max(0., params["collision_damping_gain"].as<double>());
+    if (params["park_stiffness"])
+        parkStiffness_ = max(0., params["park_stiffness"].as<double>());
+    if (params["park_damping"])
+        parkDamping_ = max(0., params["park_damping"].as<double>());
 
     // Left/Right mounting — set directly from YAML while IMU-based detection stays
     // disabled (see RobotMTR.h); swap "L"/"R" here if the physical setup changes.

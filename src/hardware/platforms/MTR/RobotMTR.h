@@ -162,7 +162,7 @@ class RobotMTR : public Robot {
     void setArmSide(ArmSide s) { armSide_ = s; }
 
     // ── Bimanual control role ──────────────────────────────────────────────────
-    // Which arm drives the live reference in MultiControllerState. Unrelated to isMaster()
+    // Which arm drives the live reference in MultiControlState. Unrelated to isMaster()
     // (BB role) or armSide() (mounting). Chosen via the master's encoder in CalibState.
     bool isLeader() const { return isLeader_; }
     void setLeader(bool v) { isLeader_ = v; }
@@ -203,6 +203,8 @@ class RobotMTR : public Robot {
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
     bool collisionLogOnly() const { return collisionLogOnly_; }
+    double parkStiffness() const { return parkStiffness_; }
+    double parkDamping() const { return parkDamping_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -320,6 +322,8 @@ class RobotMTR : public Robot {
         double collisionSpringGain_ = 0.25;
         double collisionDecayLength_ = 0.05;
         double collisionDampingGain_ = 2.0;
+        double parkStiffness_ = 250.0;  // N/m — holds the non-follower arm at its calibration pose
+        double parkDamping_ = 20.0;     // N*s/m
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 

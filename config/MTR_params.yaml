@@ -6,6 +6,8 @@ collision_influence_distance: 0.15  # Hitbox clearance or horizontal EE X separa
 collision_spring_gain: 0  # Exponential spring gain [N]
 collision_decay_length: 0.05  # Exponential spring length scale [m]
 collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
+park_stiffness: 250.0  # Non-follower arm hold spring gain [N/m]
+park_damping: 20.0  # Non-follower arm hold damping gain [N*s/m]
 
 v1_unit:
   arm_side: "L"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup
