@@ -207,14 +207,29 @@ class RobotMTR : public Robot {
     double collisionSpringGain() const { return collisionSpringGain_; }
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
+    double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
+    double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
+    double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
     bool collisionLogOnly() const { return collisionLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
-    /** 2×2 planar Jacobian. */
+    /** 2×2 planar Jacobian in this robot's local (shoulder) frame. */
     Eigen::Matrix2d J();
 
-    /** 2R planar forward kinematics → end-effector position (x, y). */
+    /** Forward kinematics → end-effector position (x, y) in the shared task frame. */
     VM2 directKinematic(VM2 q);
+
+    // ── Shared task frame ─────────────────────────────────────────────────────
+    // Every task-space quantity this class exposes (end-effector position, velocity, force,
+    // setEndEffForce* input) is in one frame shared by both units: origin at the centre
+    // between the two shoulder joints, common x/y axes. task_origin (YAML) is that origin's
+    // position seen from this robot's shoulder in its local axes; task_mirror_x (mirror-image
+    // arm) reverses the local x axis and task_yaw then rotates it into the shared axes. The
+    // defaults (origin at the shoulder, no mirror, no rotation) reproduce the old local frame.
+    VM2 toTaskFrame(const VM2 &localPoint) const  { return taskRotation_ * (localPoint - taskOrigin_); }
+    VM2 fromTaskFrame(const VM2 &taskPoint) const { return taskRotation_.transpose() * taskPoint + taskOrigin_; }
+    VM2 toTaskVector(const VM2 &localVector) const  { return taskRotation_ * localVector; }
+    VM2 fromTaskVector(const VM2 &taskVector) const { return taskRotation_.transpose() * taskVector; }
 
     /** Returns VM2::Zero() — horizontal plane, gravity is perpendicular. */
     VM2 calculateGravityTorques();
@@ -247,7 +262,8 @@ class RobotMTR : public Robot {
     const VX &getEndEffForce();
     const VX &getInteractionForce();
 
-    void printStatus();
+    void printStatus(const char *role = nullptr);   //!< Prefixed with [unit role]
+    void printSingularityStatus();                  //!< Elbow angle and singularity damping torque
     void printJointStatus();
 
    private:
@@ -260,6 +276,8 @@ class RobotMTR : public Robot {
     double L1             = 0.43;   //!< Proximal link [m]  (MUST VERIFY)
     double L2             = 0.37;   //!< Distal   link [m]  (MUST VERIFY)
     double parallel_ratio = 1.0;    //!< Joint-2 parallelogram transmission ratio
+    VM2 taskOrigin_ = VM2::Zero();                                 //!< Shared origin in local frame [m]
+    Eigen::Matrix2d taskRotation_ = Eigen::Matrix2d::Identity();  //!< Local → shared axes (may mirror)
 
     // Robot pose and link collision geometry in the shared workspace.
     double collisionBaseX = 0.0;                 //!< Shoulder x position [m]
@@ -325,6 +343,9 @@ class RobotMTR : public Robot {
         double collisionSpringGain_ = 0.25;
         double collisionDecayLength_ = 0.05;
         double collisionDampingGain_ = 2.0;
+        double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
+        double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
+        double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
@@ -360,6 +381,8 @@ class RobotMTR : public Robot {
     // than going through Drive/CopleyDrive (shared with other robot platforms).
     std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
     int livenessCheckCounter_ = 0;
+    double lastSaturationWarn_ = 0.0;   // time of the last force-saturation warning [s]
+    int saturationCount_ = 0;           // saturated cycles since that warning
     static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
                                                        // SDO round-trips are slow/blocking,
                                                        // unlike the PDO-based control traffic

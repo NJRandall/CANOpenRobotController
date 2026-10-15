@@ -6,20 +6,26 @@ collision_influence_distance: 0.15  # Hitbox clearance or horizontal EE X separa
 collision_spring_gain: 0  # Exponential spring gain [N]
 collision_decay_length: 0.05  # Exponential spring length scale [m]
 collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
+controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
+controller_damping: 20  # Damping D for the same controllers [N*s/m]
+align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
 
 v1_unit:
-  drive_node_ids: [1, 3]  # Joint 0 and joint 1 CANopen node IDs
+  task_origin: [-0.26, -0.067]  # Shared task-frame origin (centre between shoulders) seen from this shoulder, local axes [m]
+  task_mirror_x: true  # Mirror-image arm: local x points the opposite way in the shared frame (+y = arm reach for both)
+  task_yaw: 0  # Rotation of this robot's local axes into the shared task frame [deg]
+  drive_node_ids: [2, 3]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 20  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
-  qDampingWidth: 10.0  # Soft-limit damping band [deg]
-  qDampingGain: 0.5  # Soft-limit damping gain [N*m*s/rad]
-  singularityDampingAngleExtended: 15.0  # Extended singularity damping range [deg]
-  singularityDampingAngleFolded: 15.0  # Folded singularity damping range [deg]
-  singularityDampingGain: 0.5  # Singularity damping gain [N*m*s/rad]
+  tauMax: 30  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 30  # Measured joint torque stop threshold [N*m]
+  qDampingWidth: 5.0  # Soft-limit damping band [deg]
+  qDampingGain: 10.0  # Soft-limit damping gain [N*m*s/rad] (0.5, 5 and 15 were too light to feel)
+  singularityDampingAngleExtended: 25.0  # Extended singularity damping range [deg]
+  singularityDampingAngleFolded: 25.0  # Folded singularity damping range [deg]
+  singularityDampingGain: 15.0  # Singularity damping gain [N*m*s/rad] (0.5, 5 and 15 were too light to feel)
   collision:
     base_x: 0.245  # Robot base x position in shared frame [m]
     base_y: 0.067  # Robot base y position in shared frame [m]
@@ -37,20 +43,23 @@ v1_unit:
       boundary: 0.05  # Frame clearance [m]
   iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
   motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
-  qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections
+  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
   reductionRatios: [13.3, 13.3]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
-  encoderCounts: [2048*4, 2048*4]  # Joint 0 and joint 1 encoder counts per motor revolution
+  encoderCounts: [8192, 8192]  # Joint 0 and joint 1 encoder counts per motor revolution (2048 lines x 4)
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-12, 160, 14, 235]  # Joint 0 and joint 1 angle limits [deg]
-  qCalibration: [-9, 135]  # Joint 0 and joint 1 calibration angles [deg]
+  qCalibration: [-10, 140]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
 
 v2_unit:
-  drive_node_ids: [2, 4]  # Joint 0 and joint 1 CANopen node IDs
+  task_origin: [-0.265, -0.067]  # Shared task-frame origin (centre between shoulders) seen from this shoulder, local axes [m]
+  task_mirror_x: false  # Mirror-image arm: local x points the opposite way in the shared frame
+  task_yaw: 0  # Rotation of this robot's local axes into the shared task frame [deg]
+  drive_node_ids: [1, 4]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
@@ -58,10 +67,10 @@ v2_unit:
   tauMax: 30  # Maximum commanded joint torque [N*m]
   tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Soft-limit damping band [deg]
-  qDampingGain: 0.5  # Soft-limit damping gain [N*m*s/rad]
+  qDampingGain: 10.0  # Soft-limit damping gain [N*m*s/rad] (0.5, 5 and 15 were too light to feel)
   singularityDampingAngleExtended: 15.0  # Extended singularity damping range [deg]
   singularityDampingAngleFolded: 15.0  # Folded singularity damping range [deg]
-  singularityDampingGain: 0.5  # Singularity damping gain [N*m*s/rad]
+  singularityDampingGain: 25.0  # Singularity damping gain [N*m*s/rad] (0.5, 5 and 15 were too light to feel)
   collision:
     base_x: 0.25  # Robot base x position in shared frame [m]
     base_y: 0.0675  # Robot base y position in shared frame [m]
@@ -81,12 +90,12 @@ v2_unit:
   motorCstt: [0.231, 0.231]  # Joint 0 and joint 1 motor torque constants [N*m/A]
   qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections
   reductionRatios: [11.083, 11.083]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
-  encoderCounts: [4096*4, 4096*4]  # Joint 0 and joint 1 encoder counts per motor revolution
+  encoderCounts: [16384, 16384]  # Joint 0 and joint 1 encoder counts per motor revolution (4096 lines x 4)
   qSigns: [1, 1]  # Joint 0 and joint 1 direction sign corrections
   calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-17, 160, 8, 235]  # Joint 0 and joint 1 angle limits [deg]
-  qCalibration: [-15.7, 135]  # Joint 0 and joint 1 calibration angles [deg]
+  qCalibration: [-15.7, 140]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]

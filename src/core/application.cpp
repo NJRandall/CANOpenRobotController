@@ -33,7 +33,15 @@ void app_communicationReset(int argc, char *argv[]) {
 #if ROS > 0
     stateMachine = std::make_unique<STATE_MACHINE_TYPE>(argc, argv);
 #else
-    stateMachine = std::make_unique<STATE_MACHINE_TYPE>();
+    // A robot that cannot be configured (e.g. its parameter file fails to load) throws from its
+    // constructor. Catching here unwinds the partly built state machine, so its destructors run
+    // (restoring the terminal, closing devices), before exiting. No drive has been started yet.
+    try {
+        stateMachine = std::make_unique<STATE_MACHINE_TYPE>();
+    } catch (const std::exception &e) {
+        spdlog::critical("Startup aborted: {}", e.what());
+        std::exit(EXIT_FAILURE);
+    }
 #endif
     stateMachine->configureMasterPDOs();
 }
