@@ -14,7 +14,7 @@ drive_liveness_timeout: 0.3  # [s] CAN silence before a drive is treated as lost
     # normal PDO jitter to avoid false positives.
 drive_liveness_log_only: false  # true=log would-be liveness timeouts without triggering EmergencyStop
 
-v1_unit:
+v1_unit:  # Prototype 1
   arm_side: "L"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup
   drive_node_ids: [1, 3]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
@@ -57,7 +57,7 @@ v1_unit:
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
 
-v2_unit:
+v2_unit:  # Prototype 2
   arm_side: "R"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup
   drive_node_ids: [2, 4]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
