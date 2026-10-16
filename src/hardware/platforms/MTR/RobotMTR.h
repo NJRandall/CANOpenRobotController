@@ -127,16 +127,17 @@ class RobotMTR : public Robot {
              const std::string &yaml_config_file = "");
 
     // Overload allowing explicit drive node ids (single-drive test wrapper uses this).
-    // isMaster: true (default) constructs the Keyboard/RotaryEncoder/LCD1602 UI hardware —
-    // only one physical unit should be master. A non-master instance leaves keyboard/encoder/lcd
-    // as nullptr: it only drives its motors over CAN, acting as a CAN-only listener.
     RobotMTR(const std::string &robot_name,
              const std::string &yaml_config_file,
-             const std::vector<int> &drive_node_ids,
-             bool isMaster = true);
+             const std::vector<int> &drive_node_ids);
     ~RobotMTR();
 
     bool isMaster() const { return isMaster_; }
+
+    // Builds the real Keyboard/RotaryEncoder/LCD1602 hardware and marks this unit as
+    // master. Called once by MTRobotMachine::init(), after it knows which unit is at
+    // index 0.
+    void becomeMaster();
 
     Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
     RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
@@ -160,12 +161,6 @@ class RobotMTR : public Robot {
     /** Manually set this robot's side — used to apply the listener's inferred (not measured)
      *  orientation once the master's own IMU reading has been decided. */
     void setArmSide(ArmSide s) { armSide_ = s; }
-
-    // ── Bimanual control role ──────────────────────────────────────────────────
-    // Which arm drives the live reference in MultiControlState. Unrelated to isMaster()
-    // (BB role) or armSide() (mounting). Chosen via the master's encoder in CalibState.
-    bool isLeader() const { return isLeader_; }
-    void setLeader(bool v) { isLeader_ = v; }
 
     // ── Drive mode initialisation ─────────────────────────────────────────────
     bool initTorqueControl()   override;
@@ -336,8 +331,7 @@ class RobotMTR : public Robot {
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
     std::shared_ptr<LCD1602> lcdOwner_;   // keeps the shared LCD alive while this unit exists
-    bool isMaster_        = true; // true: constructs keyboard/encoder/lcd/imu; false: CAN-only listener
-    bool isLeader_        = false; // bimanual control role — see isLeader() above
+    bool isMaster_        = false; // set true by becomeMaster(); starts as a CAN-only listener
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
     // IMU disabled — not in use for now. Uncomment to re-enable.

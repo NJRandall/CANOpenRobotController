@@ -20,8 +20,8 @@ using namespace std;
 
 // New overload constructs joints based on explicit drive_node_ids
 RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
-                   const std::vector<int> &drive_node_ids, bool isMaster)
-    : Robot(robot_name, yaml_config_file), isMaster_(isMaster), driveNodeIds_(drive_node_ids) {
+                   const std::vector<int> &drive_node_ids)
+    : Robot(robot_name, yaml_config_file), driveNodeIds_(drive_node_ids) {
 
     // Load YAML overrides before joints are constructed so limits are correct.
     initialiseFromYAML(yaml_config_file);
@@ -63,41 +63,44 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
                              qDampingWidth, qDampingGain, counts));
     }
 
-    // UI hardware (keyboard/encoder/LCD) is master-only: a non-master unit has none of
-    // this physically wired — it only drives its motors over CAN — so keyboard/encoder/lcd
-    // stay nullptr (their in-class initialisers) rather than aliasing the master's hardware.
-    if (isMaster_) {
-        addInput(keyboard = new Keyboard());
-
-        // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
-        addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
-
-        // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2. There is one physical LCD per
-        // BeagleBone, so every unit on this board shares one LCD1602 object (and its single
-        // flush thread). Two objects would interleave half-byte writes and garble the display.
-        static std::weak_ptr<LCD1602> sharedLcd;
-        lcdOwner_ = sharedLcd.lock();
-        if (!lcdOwner_) {
-            lcdOwner_ = std::make_shared<LCD1602>(0x27, 2);
-            lcdOwner_->init();
-            sharedLcd = lcdOwner_;
-        }
-        lcd = lcdOwner_.get();
-
-        // IMU disabled — not in use for now. Uncomment to re-enable.
-        // // MPU-6050 IMU for Left/Right orientation detection — master only (see armSide()
-        // // comment in RobotMTR.h for why the listener's side is inferred rather than measured).
-        // // TODO: confirm address/bus against the physical wiring. Default MPU-6050 address is
-        // // 0x68 (AD0 pin low); 0x69 if AD0 is tied to 3.3V. Bus 1 is free (LCD above uses bus 2).
-        // addInput(imu = new I2CMPU6050IMU(0x68, 1));
-
-        // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR, used if
-        // present; isConnected() is false (not a crash) when no mouse is plugged in.
-        addInput(mouse = new USBMouse());
-    }
+    // UI hardware (keyboard/encoder/LCD) is built later, by becomeMaster() — not here,
+    // since detection hasn't run yet and we don't know which unit will be master.
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
+}
+
+void RobotMTR::becomeMaster() {
+    if (isMaster_) return;  // already master; don't build the hardware twice
+    isMaster_ = true;
+
+    addInput(keyboard = new Keyboard());
+
+    // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
+    addInput(encoder = new RotaryEncoder(8, 11, 8, 12, 8, 15));
+
+    // 16x2 I2C LCD: PCF8574 at 0x27 on /dev/i2c-2. There is one physical LCD per
+    // BeagleBone, so every unit on this board shares one LCD1602 object (and its single
+    // flush thread). Two objects would interleave half-byte writes and garble the display.
+    static std::weak_ptr<LCD1602> sharedLcd;
+    lcdOwner_ = sharedLcd.lock();
+    if (!lcdOwner_) {
+        lcdOwner_ = std::make_shared<LCD1602>(0x27, 2);
+        lcdOwner_->init();
+        sharedLcd = lcdOwner_;
+    }
+    lcd = lcdOwner_.get();
+
+    // IMU disabled — not in use for now. Uncomment to re-enable.
+    // // MPU-6050 IMU for Left/Right orientation detection — master only (see armSide()
+    // // comment in RobotMTR.h for why the listener's side is inferred rather than measured).
+    // // TODO: confirm address/bus against the physical wiring. Default MPU-6050 address is
+    // // 0x68 (AD0 pin low); 0x69 if AD0 is tied to 3.3V. Bus 1 is free (LCD above uses bus 2).
+    // addInput(imu = new I2CMPU6050IMU(0x68, 1));
+
+    // Optional local USB mouse — live reference for MOUSE_MIMIC/MOUSE_MIRROR, used if
+    // present; isConnected() is false (not a crash) when no mouse is plugged in.
+    addInput(mouse = new USBMouse());
 }
 
 // Original two-argument constructor delegates to the drive-node overload with default nodes 1 and 3
@@ -328,7 +331,7 @@ bool RobotMTR::initialiseNetwork() {
 }
 
 bool RobotMTR::initialiseInputs() {
-    return true;   // encoder is registered via addInput() in constructor
+    return true;   // master's inputs are registered via addInput() in becomeMaster()
 }
 
 std::size_t RobotMTR::probeDriveNodes() const {
