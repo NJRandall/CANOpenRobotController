@@ -8,6 +8,11 @@ collision_decay_length: 0.05  # Exponential spring length scale [m]
 collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
 park_stiffness: 250.0  # Non-follower arm hold spring gain [N/m]
 park_damping: 20.0  # Non-follower arm hold damping gain [N*s/m]
+drive_liveness_timeout: 0.3  # [s] CAN silence before a drive is treated as lost.
+    # Passive check (no CAN traffic sent, safe at any value) -- but the control loop
+    # runs every 2ms (controlLoopPeriodInms, application.h), so keep this well above
+    # normal PDO jitter to avoid false positives.
+drive_liveness_log_only: false  # true=log would-be liveness timeouts without triggering EmergencyStop
 
 v1_unit:
   arm_side: "L"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup

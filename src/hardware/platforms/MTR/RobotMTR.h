@@ -185,6 +185,7 @@ class RobotMTR : public Robot {
     setMovementReturnCode_t safetyCheck();
     bool hasSafetyTriggered() const { return safetyTriggered_; }
     void clearSafetyTrigger()       { safetyTriggered_ = false; }  // called on EmergencyStop reset
+    void triggerSafetyStop()        { safetyTriggered_ = true; disable(); }  // see pollDriveMonitor()
 
     // ── Calibration ───────────────────────────────────────────────────────────
     void applyCalibration();
@@ -205,6 +206,8 @@ class RobotMTR : public Robot {
     bool collisionLogOnly() const { return collisionLogOnly_; }
     double parkStiffness() const { return parkStiffness_; }
     double parkDamping() const { return parkDamping_; }
+    double driveLivenessTimeout() const { return driveLivenessTimeoutS_; }
+    bool driveLivenessLogOnly() const { return driveLivenessLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian. */
@@ -324,6 +327,8 @@ class RobotMTR : public Robot {
         double collisionDampingGain_ = 2.0;
         double parkStiffness_ = 250.0;  // N/m — holds the non-follower arm at its calibration pose
         double parkDamping_ = 20.0;     // N*s/m
+        double driveLivenessTimeoutS_ = 0.3;  // s — CAN silence before a drive node is treated as lost
+        bool driveLivenessLogOnly_ = false;   // true=log would-be timeouts without triggering EmergencyStop
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
@@ -349,16 +354,9 @@ class RobotMTR : public Robot {
     // void updateArmSide();
 
     // ── Drive liveness ─────────────────────────────────────────────────────────
-    // Periodic check that each drive node still answers on the CAN bus. A non-responding
-    // node sets safetyTriggered_, which safetyStop (MTRobotMachine.cpp) turns into an
-    // EmergencyStop transition. Kept MTR-local: calls cancomm_socketFree() directly with the
-    // same SDO-read-and-check-for-"OK" logic Drive::sendSDOMessages() already uses, rather
-    // than going through Drive/CopleyDrive (shared with other robot platforms).
+    // Startup presence: checkDriveAlive() (probeDriveNodes()). Ongoing silence:
+    // monitored passively by MTRobotMachine::pollDriveMonitor() — see triggerSafetyStop().
     std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
-    int livenessCheckCounter_ = 0;
-    static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
-                                                       // SDO round-trips are slow/blocking,
-                                                       // unlike the PDO-based control traffic
     static bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────

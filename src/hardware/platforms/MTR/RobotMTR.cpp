@@ -156,6 +156,10 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         parkStiffness_ = max(0., params["park_stiffness"].as<double>());
     if (params["park_damping"])
         parkDamping_ = max(0., params["park_damping"].as<double>());
+    if (params["drive_liveness_timeout"])
+        driveLivenessTimeoutS_ = max(0., params["drive_liveness_timeout"].as<double>());
+    if (params["drive_liveness_log_only"])
+        driveLivenessLogOnly_ = params["drive_liveness_log_only"].as<bool>();
 
     // Left/Right mounting — set directly from YAML while IMU-based detection stays
     // disabled (see RobotMTR.h); swap "L"/"R" here if the physical setup changes.
@@ -600,22 +604,7 @@ void RobotMTR::updateRobot() {
         disable();
     }
 
-    // Polling liveness check disabled — drive power-off is detected from the drives' EMCY
-    // frames instead (MTRobotMachine::openDrivePowerMonitor). Each SDO poll blocked the
-    // control loop for ~20 ms per drive. Uncomment to re-enable.
-    // Throttled drive-liveness check — sets safetyTriggered_ on failure, which safetyStop
-    // (MTRobotMachine.cpp) turns into an EmergencyStop transition.
-    // if (++livenessCheckCounter_ >= livenessCheckPeriod_) {
-    //     livenessCheckCounter_ = 0;
-    //     for (int nodeID : driveNodeIds_) {
-    //         if (!checkDriveAlive(nodeID)) {
-    //             spdlog::error("RobotMTR: drive node {} not responding — treating as lost.", nodeID);
-    //             safetyTriggered_ = true;
-    //             disable();
-    //             break;
-    //         }
-    //     }
-    // }
+    // Ongoing drive silence is monitored passively — see MTRobotMachine::pollDriveMonitor().
 
     last_update_time = chrono::duration_cast<chrono::microseconds>(
         chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
@@ -626,10 +615,8 @@ void RobotMTR::updateRobot() {
 // Drive liveness
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// SDO read of register 0x6076 (static, read-only). A successful read replies "[seq] <data>"
-// (only writes reply "OK"), while a timeout or abort replies "[seq] ERROR: ...", so the drive
-// is alive if the reply has no "ERROR". Kept MTR-local rather than changing
-// Drive::SDORead(), which is shared with other robot platforms and checks for "OK".
+// SDO read of register 0x6076. Replies with "ERROR" on timeout/abort, so the drive is
+// alive if the reply has none. Used once at startup by probeDriveNodes().
 bool RobotMTR::checkDriveAlive(int nodeID) {
 #ifdef NOROBOT
     (void)nodeID;
