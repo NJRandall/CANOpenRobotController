@@ -89,7 +89,7 @@ RobotMTR::RobotMTR(const string &robot_name, const string &yaml_config_file,
         }
         addInput(keyboard = keyboardOwner_.get());
 
-        // KY-040 rotary encoder: S1(CLK)=P8_11, S2(DT)=P8_12, Key(SW)=P8_15
+        // KY-040 rotary encoder: S1(CLK)=P8_8, S2(DT)=P8_9, Key(SW)=P8_10
         static std::weak_ptr<RotaryEncoder> sharedEncoder;
         encoderOwner_ = sharedEncoder.lock();
         if (!encoderOwner_) {
@@ -198,12 +198,37 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         collisionDecayLength_ = max(1e-6, params["collision_decay_length"].as<double>());
     if (params["collision_damping_gain"])
         collisionDampingGain_ = max(0., params["collision_damping_gain"].as<double>());
+    if (params["midline_influence_distance"])
+        midlineInfluenceDistance_ = max(0., params["midline_influence_distance"].as<double>());
+    if (params["midline_spring_gain"])
+        midlineSpringGain_ = max(0., params["midline_spring_gain"].as<double>());
+    if (params["midline_decay_length"])
+        midlineDecayLength_ = max(1e-6, params["midline_decay_length"].as<double>());
+    if (params["midline_damping_gain"])
+        midlineDampingGain_ = max(0., params["midline_damping_gain"].as<double>());
     if (params["controller_stiffness"])
         controllerStiffness_ = params["controller_stiffness"].as<double>();
     if (params["controller_damping"])
         controllerDamping_ = params["controller_damping"].as<double>();
     if (params["align_speed"])
         alignSpeed_ = params["align_speed"].as<double>();
+    if (params["park_stiffness"])
+        parkStiffness_ = params["park_stiffness"].as<double>();
+    if (params["park_damping"])
+        parkDamping_ = params["park_damping"].as<double>();
+    if (params["park_max_torque"])
+        parkMaxTorque_ = params["park_max_torque"].as<double>();
+    if (params["park_speed"])
+        parkSpeed_ = params["park_speed"].as<double>() * M_PI / 180.;
+    if (params["park_max_force"])
+        spdlog::warn("RobotMTR {}: park_max_force is no longer used; the park hold is joint-space "
+                     "(park_max_torque).", robotName);
+    if (!std::isfinite(parkStiffness_) || parkStiffness_ < 0.0 ||
+        !std::isfinite(parkDamping_) || parkDamping_ < 0.0 ||
+        !std::isfinite(parkMaxTorque_) || parkMaxTorque_ < 0.0 ||
+        !std::isfinite(parkSpeed_) || parkSpeed_ <= 0.0)
+        throw std::invalid_argument("RobotMTR: park_stiffness, park_damping and park_max_torque "
+                                    "must be finite and >= 0, park_speed > 0");
     if (!std::isfinite(alignSpeed_) || alignSpeed_ <= 0.0)
         throw std::invalid_argument("RobotMTR: align_speed must be finite and > 0");
     if (!std::isfinite(controllerStiffness_) || controllerStiffness_ < 0.0 ||
@@ -820,13 +845,14 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 setMovementReturnCode_t RobotMTR::setJointTorque(VM2 tau,
-                                                  bool applySingularityDamping) {
+                                                  bool applySingularityDamping,
+                                                  bool applyLimitDamping) {
     if (applySingularityDamping && joints.size() > 1) {
         VM2 q(joints[0]->getPosition(), joints[1]->getPosition());
         VM2 dq(joints[0]->getVelocity(), joints[1]->getVelocity());
         tau += singularityDampingTorque(q, dq);
     }
-    return applyTorque({tau[0], tau[1]});
+    return applyTorque({tau[0], tau[1]}, applyLimitDamping);
 }
 
 setMovementReturnCode_t RobotMTR::setJointPosition(VM2 q) {
@@ -966,12 +992,12 @@ RobotMTR::setEndEffForceWithCompensation(VM2 F, bool friction_comp,
 // Private drive helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
-setMovementReturnCode_t RobotMTR::applyTorque(vector<double> torques) {
+setMovementReturnCode_t RobotMTR::applyTorque(vector<double> torques, bool applyLimitDamping) {
     lastCommandedTorque = VM2(torques[0], torques.size() > 1 ? torques[1] : 0.0);
     int i = 0;
     setMovementReturnCode_t ret = SUCCESS;
     for (auto p : joints) {
-        setMovementReturnCode_t code = ((JointMT *)p)->setTorque(torques[i]);
+        setMovementReturnCode_t code = ((JointMT *)p)->setTorque(torques[i], applyLimitDamping);
         if (code == INCORRECT_MODE) {
             spdlog::error("MTR {} joint {}: not in torque control.", robotName, p->getId());
             ret = INCORRECT_MODE;

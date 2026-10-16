@@ -207,9 +207,18 @@ class RobotMTR : public Robot {
     double collisionSpringGain() const { return collisionSpringGain_; }
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
+    // Mirror-mode midline (x = 0) collision line for the leader
+    double midlineInfluenceDistance() const { return midlineInfluenceDistance_; }
+    double midlineSpringGain() const { return midlineSpringGain_; }
+    double midlineDecayLength() const { return midlineDecayLength_; }
+    double midlineDampingGain() const { return midlineDampingGain_; }
     double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
     double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
     double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
+    double parkStiffness() const { return parkStiffness_; }   //!< Parked-arm joint hold K [N·m/rad]
+    double parkDamping() const { return parkDamping_; }       //!< Parked-arm joint hold D [N·m·s/rad]
+    double parkMaxTorque() const { return parkMaxTorque_; }   //!< Parked-arm per-joint torque cap [N·m]
+    double parkSpeed() const { return parkSpeed_; }           //!< Parked-arm joint target speed [rad/s]
     bool collisionLogOnly() const { return collisionLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
@@ -245,7 +254,8 @@ class RobotMTR : public Robot {
 
     // ── Joint-space setters ───────────────────────────────────────────────────
     setMovementReturnCode_t setJointTorque(VM2 tau,
-                                            bool applySingularityDamping = true);
+                                            bool applySingularityDamping = true,
+                                            bool applyLimitDamping = true);
     setMovementReturnCode_t setJointPosition(VM2 q);
     setMovementReturnCode_t setJointVelocity(VM2 dq);
 
@@ -345,9 +355,17 @@ class RobotMTR : public Robot {
         double collisionSpringGain_ = 0.25;
         double collisionDecayLength_ = 0.05;
         double collisionDampingGain_ = 2.0;
+        double midlineInfluenceDistance_ = 0.08;   // midline_influence_distance [m]
+        double midlineSpringGain_ = 1.0;           // midline_spring_gain [N]
+        double midlineDecayLength_ = 0.03;         // midline_decay_length [m]
+        double midlineDampingGain_ = 30.0;         // midline_damping_gain [N*s/m]
         double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
         double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
         double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
+        double parkStiffness_ = 20.0;          // park_stiffness (YAML) [N·m/rad]
+        double parkDamping_ = 1.0;             // park_damping (YAML) [N·m·s/rad]
+        double parkMaxTorque_ = 4.0;           // park_max_torque (YAML) [N·m]
+        double parkSpeed_ = 10.0 * M_PI / 180.0;  // park_speed (YAML, deg/s) [rad/s]
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
@@ -408,7 +426,7 @@ class RobotMTR : public Robot {
     void fillParam(YAML::Node node, std::vector<double> &vec);
 
     // ── Private drive helpers ─────────────────────────────────────────────────
-    setMovementReturnCode_t applyTorque(std::vector<double> torques);
+    setMovementReturnCode_t applyTorque(std::vector<double> torques, bool applyLimitDamping = true);
     setMovementReturnCode_t applyPosition(std::vector<double> positions);
     setMovementReturnCode_t applyVelocity(std::vector<double> velocities);
     VM2 singularityDampingTorque(VM2 q, VM2 dq) const;

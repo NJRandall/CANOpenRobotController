@@ -4,9 +4,9 @@
  *
  * Wiring (BeagleBone header pins):
  *   VCC → P9_3 (3.3 V)   GND → P9_1
- *   S1 (CLK) → P8_11  (GPIO_45)
- *   S2 (DT)  → P8_12  (GPIO_44)
- *   Key (SW) → P8_15  (GPIO1_47)
+ *   S1 (CLK) → P8_8   (GPIO2_3, gpio67)
+ *   S2 (DT)  → P8_9   (GPIO2_5, gpio69)
+ *   Key (SW) → P8_10  (GPIO2_4, gpio68)
  *
  * Usage — call updateInput() every control cycle (via Robot::updateRobot).
  *   getRotation()   → -1 (CCW), 0 (no change), +1 (CW)  — valid for one cycle
