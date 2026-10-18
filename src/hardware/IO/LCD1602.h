@@ -70,7 +70,7 @@ class LCD1602 : public I2CDevice {
     void setBacklight(bool on);
 
    private:
-    bool backlightOn = true;
+    std::atomic<bool> backlightOn{true};   //!< Read by the flush thread while unlocked
 
     static constexpr uint8_t RS = 0x01;   //!< P0 — register select
     static constexpr uint8_t E  = 0x04;   //!< P2 — enable strobe
@@ -80,8 +80,9 @@ class LCD1602 : public I2CDevice {
     std::mutex        bufMutex_;
     std::atomic<bool> running_{false};
     bool              dirty_     = false;
+    bool              forceRewrite_ = false;  //!< Next flush rewrites both rows (clear/backlight)
     char              buffer_[2][17];      //!< Desired display content
-    char              displayed_[2][17];   //!< Last content written to hardware
+    char              displayed_[2][17];   //!< Last content written to hardware; flush thread only
 
     // Virtual cursor (main-thread only — no mutex needed)
     uint8_t curRow_ = 0;

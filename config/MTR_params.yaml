@@ -6,20 +6,31 @@ collision_influence_distance: 0.15  # Hitbox clearance or horizontal EE X separa
 collision_spring_gain: 2  # Exponential spring gain [N]
 collision_decay_length: 0.05  # Exponential spring length scale [m]
 collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
-park_stiffness: 250.0  # Non-follower arm hold spring gain [N/m]
-park_damping: 20.0  # Non-follower arm hold damping gain [N*s/m]
 drive_liveness_timeout: 0.3  # [s] CAN silence before a drive is treated as lost.
     # Passive check (no CAN traffic sent, safe at any value) -- but the control loop
     # runs every 2ms (controlLoopPeriodInms, application.h), so keep this well above
     # normal PDO jitter to avoid false positives.
 drive_liveness_log_only: false  # true=log would-be liveness timeouts without triggering EmergencyStop
-controller_stiffness: 250  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error.
-    # Thursday-tested value was 100 — kept at the value already active before this was wired in;
-    # switch to 100 (or re-tune) once validated on hardware.
-controller_damping: 20  # Damping D for the same controllers [N*s/m]
-align_speed: 0.05  # Max speed of the catch-up term only when easing the target into a mirror/parked reference [m/s]; never caps steady tracking once caught up
+midline_influence_distance: 0.08  # Mirror mode: leader is pushed back within this of the midline x=0 [m]
+midline_spring_gain: 1.0  # Mirror-mode midline exponential spring gain [N] (~13 N at the line)
+midline_decay_length: 0.03  # Mirror-mode midline spring length scale [m]
+midline_damping_gain: 30  # Mirror-mode midline closing-speed damping [N*s/m]
+controller_stiffness: 200  # Spring K at 100% assistance for mimic/mirror tracking [N/m]; 20 N cap reached at 20/K m error.
+    # Sunday-hardware-tested value (was 100 Thursday).
+controller_damping: 25  # Damping D for the same controllers [N*s/m] (not scaled by assistance)
+align_speed: 0.05  # Max speed of the catch-up term only when easing the Mirroring target in [m/s]; never caps steady tracking once caught up
 align_kp: 5.0  # Catch-up proportional gain: catch-up speed = min(align_kp * position_error, align_speed) [1/s]
 align_tau_accel: 0.15  # Time constant smoothing velocity toward its commanded value, bounding acceleration during catch-up [s]
+bimanual_asymmetric_spring: false  # Bimanual: reflect a weaker follower spring-damper back onto the leader
+bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader
+# park_stiffness/park_damping/park_max_torque/park_speed hold the non-follower arm in JOINT
+# space (qCalibration), not task space: both units' calibration poses sit at or past the
+# folded-elbow singularity stop (see singularityFoldedStop below), where a task-space force
+# spring risks the Jacobian amplifying a bounded end-effector force into excess joint torque.
+park_stiffness: 40  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
+park_damping: 1.0  # Unused arm's hold joint damping [N*m*s/rad] (0 = spring only)
+park_max_torque: 8  # Unused arm's hold torque cap per joint [N*m]
+park_speed: 10  # Speed the hold target moves to qCalibration [deg/s]
 
 v1_unit:  # Prototype 1
   arm_side: "L"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup
@@ -31,15 +42,15 @@ v1_unit:  # Prototype 1
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 30  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 30  # Measured joint torque stop threshold [N*m]
+  tauMax: 10  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Joint-limit damping band [deg]
-  qDampingGain: 5.0  # Joint-limit damping gain [N*m*s/rad] (same on both units)
+  qDampingGain: 0.0  # Joint-limit damping gain [N*m*s/rad] (same on both units)
   singularityDampingAngleExtended: 20.0  # Damping band before the extended elbow stop [deg]
   singularityDampingAngleFolded: 35.0  # Damping band before the folded elbow stop [deg]
   singularityExtendedStop: 25.0  # Elbow angle q2-q1 of the extended stop (q1=50, q2=75); full damping here [deg]
   singularityFoldedStop: 150.0  # Elbow angle q2-q1 of the folded stop (q1=-10, q2=140); full damping here [deg]
-  singularityDampingGain: 15.0  # Singularity damping gain [N*m*s/rad] (same on both units)
+  singularityDampingGain: 0.0  # Singularity damping gain [N*m*s/rad] (same on both units)
   collision:
     link_thickness: 0.04  # Link diameter [m]
     boundary: 0.02  # Link clearance [m]
@@ -64,6 +75,7 @@ v1_unit:  # Prototype 1
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
+  maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
 
 v2_unit:  # Prototype 2
   arm_side: "R"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup
@@ -76,9 +88,9 @@ v2_unit:  # Prototype 2
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
   tauMax: 30  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
-  qDampingWidth: 10.0  # Joint-limit damping band [deg]
-  qDampingGain: 10.0  # Joint-limit damping gain [N*m*s/rad] (same on both units)
+  tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
+  qDampingWidth: 15.0  # Joint-limit damping band [deg]
+  qDampingGain: 25.0  # Joint-limit damping gain [N*m*s/rad]
   singularityDampingAngleExtended: 20.0  # Damping band before the extended elbow stop [deg]
   singularityDampingAngleFolded: 35.0  # Damping band before the folded elbow stop [deg]
   singularityExtendedStop: 25.0  # Elbow angle q2-q1 of the extended stop (q1=50, q2=75); full damping here [deg]
@@ -108,3 +120,4 @@ v2_unit:  # Prototype 2
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
+  maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]

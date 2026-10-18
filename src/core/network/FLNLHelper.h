@@ -101,6 +101,13 @@ class FLNLHelper
         }
 
         /**
+        * \brief True when a client is connected and a message can be sent without blocking
+        */
+        bool canSend() {
+            return FLNLServer.IsWritable();
+        }
+
+        /**
         * \brief Allow for reconnection (wait for client)
         */
         void reconnect() {
@@ -190,8 +197,10 @@ class FLNLHelper
                         return;
                     }
                 }
-                //Send it
-                FLNLServer.Send(stateValues);
+                //Send it, unless the client is not keeping up: then drop this frame rather
+                //than block the caller (the control loop) until the client reads
+                if(FLNLServer.IsWritable())
+                    FLNLServer.Send(stateValues);
             }
         }
 

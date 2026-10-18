@@ -35,7 +35,20 @@ void Keyboard::updateInput() {
 }
 void Keyboard::setKeys() {
     /// set last Key states
-    char ch = fgetc(stdin);
+    applyKey(fgetc(stdin));
+}
+
+void Keyboard::injectKey(char ch) {
+    applyKey(ch);
+    if (getNb() >= 0)
+        spdlog::info("GUI pressed #{}", getNb());
+    else if (getKeyUC() > 0)
+        spdlog::info("GUI pressed {}", (char)getKeyUC());
+    else if (ch == '\n')
+        spdlog::info("GUI pressed Enter");
+}
+
+void Keyboard::applyKey(char ch) {
     /* Set States, limited to one key Press at a time*/
 
     switch (ch) {

@@ -46,6 +46,7 @@ typedef struct keys {
 class Keyboard : public InputDevice {
    private:
     key_states currentKeyStates;
+    void applyKey(char ch);
     int keyboardActive;
 
    public:
@@ -63,6 +64,9 @@ class Keyboard : public InputDevice {
      *
      */
     void setKeys();
+    /** Software key press (e.g. a GUI button), seen this cycle exactly like a typed key.
+        Call after updateInput(), which clears the key states every cycle. */
+    void injectKey(char ch);
     /**
     * \brief defintion of <class>Input</class> pure virtual function. Updates the keyboard input devices
     * memory states from implemented keyboard input from user. E.g. A key has been pressed or not.

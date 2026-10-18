@@ -59,6 +59,8 @@ class JointMT : public Joint {
     int jointTorqueToDriveUnit(double jointValue) { return (int)(sign * jointValue / (motorTorqueConstant * Ipeak) * 1000.0 / reductionRatio); };
 
    public:
+    //! True once setMode(CM_TORQUE_CONTROL) has configured the drive (0x6060 persists).
+    bool inTorqueMode() const { return driveMode == CM_TORQUE_CONTROL; }
     JointMT(int jointID, double q_min, double q_max, short int sign_ = 1, double dq_min = 0, double dq_max = 0, double tau_min = 0, double tau_max = 0, double ipeak = 2.795, double motor_kt = 0.114, double reduction_ratio = 15.0, Drive *drive = NULL, const std::string& name="", double q_damping_width = 10.0 * M_PI / 180.0, double q_damping_gain = 0.5, int encoder_counts = 4096);
     ~JointMT();
     /**
@@ -71,6 +73,8 @@ class JointMT : public Joint {
     setMovementReturnCode_t setPosition(double qd);
     setMovementReturnCode_t setVelocity(double dqd);
     setMovementReturnCode_t setTorque(double taud);
+    /** As setTorque(); applyLimitDamping=false skips the soft-limit damping (stop cut-off kept). */
+    setMovementReturnCode_t setTorque(double taud, bool applyLimitDamping);
 
     bool initNetwork();
 };

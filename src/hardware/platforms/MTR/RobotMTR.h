@@ -183,6 +183,9 @@ class RobotMTR : public Robot {
     bool hasSafetyTriggered() const { return safetyTriggered_; }
     void clearSafetyTrigger()       { safetyTriggered_ = false; }  // called on EmergencyStop reset
     void triggerSafetyStop()        { safetyTriggered_ = true; disable(); }  // see pollDriveMonitor()
+    // EmergencyStop reset: clears drive faults and confirms every drive reaches Ready to
+    // Switch On with bus voltage present. Leaves the drives disabled; false if any is not ready.
+    bool recoverDrives();
 
     // ── Calibration ───────────────────────────────────────────────────────────
     void applyCalibration();
@@ -200,36 +203,61 @@ class RobotMTR : public Robot {
     double collisionSpringGain() const { return collisionSpringGain_; }
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
+    // Mirror-mode midline (x = 0) collision line for the leader
+    double midlineInfluenceDistance() const { return midlineInfluenceDistance_; }
+    double midlineSpringGain() const { return midlineSpringGain_; }
+    double midlineDecayLength() const { return midlineDecayLength_; }
+    double midlineDampingGain() const { return midlineDampingGain_; }
     double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
     double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
-    double alignSpeed() const { return alignSpeed_; }   //!< Max catch-up speed when easing the target into a reference pose [m/s]
+    double alignSpeed() const { return alignSpeed_; }   //!< Max catch-up speed when easing the Mirroring target in [m/s]
     double alignKp() const { return alignKp_; }         //!< Catch-up proportional gain [1/s]
     double alignTauAccel() const { return alignTauAccel_; }   //!< Velocity smoothing time constant during catch-up [s]
     bool collisionLogOnly() const { return collisionLogOnly_; }
-    double parkStiffness() const { return parkStiffness_; }
-    double parkDamping() const { return parkDamping_; }
     double driveLivenessTimeout() const { return driveLivenessTimeoutS_; }
     bool driveLivenessLogOnly() const { return driveLivenessLogOnly_; }
+    bool bimanualAsymmetricSpring() const { return bimanualAsymmetricSpring_; }   //!< Reflect follower spring onto leader
+    double bimanualReflectionRatio() const { return bimanualReflectionRatio_; }     //!< Fraction of follower force reflected
 
-    // ── Parked-arm hold smoothing (see trackSmoothly()/holdParkedRobot() in
-    // MTRobotStates.cpp) ── Kept here rather than on any one State class, since
-    // parking continues across several states (UniModeDecisionState ->
-    // ReferenceGenerationState -> UniControlState) without resetting. Reset once,
-    // when parking begins; advanced only during the initial catch-up to the parked
-    // pose, then deactivated — see trackSmoothly()'s done/active handoff.
-    VM2  parkSmoothPos()      const { return parkSmoothPos_; }
-    VM2  parkSmoothVelocity() const { return parkSmoothVel_; }
-    bool parkSmoothActive()   const { return parkSmoothActive_; }
-    void setParkSmooth(VM2 pos, VM2 vel, bool active) {
-        parkSmoothPos_ = pos; parkSmoothVel_ = vel; parkSmoothActive_ = active;
+    // ── Parked-arm hold (see holdParkedRobot() in MTRobotStates.cpp) ──────────
+    // Joint-space, not task-space: both units' qCalibration sit at or past
+    // singularityFoldedStop (v1: q2-q1=150=the stop exactly; v2: 155.7, past it), so a
+    // task-space force spring there risks Jᵀ amplifying a bounded end-effector force into
+    // an oversized joint torque via the near-singular Jacobian. Joint-space torque control
+    // sidesteps that entirely — torque is clamped directly at parkMaxTorque_, independent
+    // of configuration. (An earlier task-space version — target/velocity smoothing via
+    // trackSmoothly(), parkStiffness_ in N/m — is kept below, commented out, in case a
+    // future design needs task-space holding away from the singularity.)
+    double parkStiffness() const { return parkStiffness_; }   //!< Parked-arm joint hold K [N·m/rad]
+    double parkDamping() const { return parkDamping_; }       //!< Parked-arm joint hold D [N·m·s/rad]
+    double parkMaxTorque() const { return parkMaxTorque_; }   //!< Parked-arm per-joint torque cap [N·m]
+    double parkSpeed() const { return parkSpeed_; }           //!< Parked-arm joint target speed [rad/s]
+    VM2  parkHoldCommand()  const { return parkHoldCommand_; }
+    bool parkHoldArrived()  const { return parkHoldArrived_; }
+    void setParkHoldCommand(VM2 command, bool arrived) {
+        parkHoldCommand_ = command; parkHoldArrived_ = arrived;
     }
-    // Call once when this unit starts being parked, so the hold target eases in from
-    // its actual current position instead of jumping straight to the calibration pose.
-    void resetParkSmooth() {
-        parkSmoothActive_ = true;
-        parkSmoothPos_ = getEndEffPosition();
-        parkSmoothVel_ = VM2::Zero();
+    // Call once when this unit starts being parked, so the hold target eases in (at
+    // parkSpeed) from its actual current joint angles instead of jumping to qCalibration.
+    void resetParkHold() {
+        const Eigen::VectorXd &q = getPosition();
+        parkHoldCommand_ = VM2(q(0), q.size() > 1 ? q(1) : 0.0);
+        parkHoldArrived_ = false;
     }
+    // ── Parked-arm hold smoothing — task-space, superseded by the joint-space hold
+    // above (see the comment there). Kept commented out, not deleted, in case task-space
+    // holding is ever needed again away from a singular configuration.
+    // VM2  parkSmoothPos()      const { return parkSmoothPos_; }
+    // VM2  parkSmoothVelocity() const { return parkSmoothVel_; }
+    // bool parkSmoothActive()   const { return parkSmoothActive_; }
+    // void setParkSmooth(VM2 pos, VM2 vel, bool active) {
+    //     parkSmoothPos_ = pos; parkSmoothVel_ = vel; parkSmoothActive_ = active;
+    // }
+    // void resetParkSmooth() {
+    //     parkSmoothActive_ = true;
+    //     parkSmoothPos_ = getEndEffPosition();
+    //     parkSmoothVel_ = VM2::Zero();
+    // }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian in this robot's local (shoulder) frame. */
@@ -264,7 +292,8 @@ class RobotMTR : public Robot {
 
     // ── Joint-space setters ───────────────────────────────────────────────────
     setMovementReturnCode_t setJointTorque(VM2 tau,
-                                            bool applySingularityDamping = true);
+                                            bool applySingularityDamping = true,
+                                            bool applyLimitDamping = true);
     setMovementReturnCode_t setJointPosition(VM2 q);
     setMovementReturnCode_t setJointVelocity(VM2 dq);
 
@@ -364,11 +393,10 @@ class RobotMTR : public Robot {
         double collisionSpringGain_ = 0.25;
         double collisionDecayLength_ = 0.05;
         double collisionDampingGain_ = 2.0;
-        double parkStiffness_ = 250.0;  // N/m — holds the non-follower arm at its calibration pose
-        double parkDamping_ = 20.0;     // N*s/m
-        VM2  parkSmoothPos_    = VM2::Zero();
-        VM2  parkSmoothVel_    = VM2::Zero();
-        bool parkSmoothActive_ = false;
+        double midlineInfluenceDistance_ = 0.08;   // midline_influence_distance [m]
+        double midlineSpringGain_ = 1.0;           // midline_spring_gain [N]
+        double midlineDecayLength_ = 0.03;         // midline_decay_length [m]
+        double midlineDampingGain_ = 30.0;         // midline_damping_gain [N*s/m]
         double driveLivenessTimeoutS_ = 0.3;  // s — CAN silence before a drive node is treated as lost
         bool driveLivenessLogOnly_ = false;   // true=log would-be timeouts without triggering EmergencyStop
         double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
@@ -376,6 +404,22 @@ class RobotMTR : public Robot {
         double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
         double alignKp_ = 5.0;                  // align_kp (YAML) [1/s]
         double alignTauAccel_ = 0.15;           // align_tau_accel (YAML) [s]
+        bool bimanualAsymmetricSpring_ = false;  // bimanual_asymmetric_spring (YAML)
+        double bimanualReflectionRatio_ = 0.1;   // bimanual_reflection_ratio (YAML) [-]
+        double parkStiffness_ = 20.0;          // park_stiffness (YAML) [N·m/rad]
+        double parkDamping_ = 1.0;             // park_damping (YAML) [N·m·s/rad]
+        double parkMaxTorque_ = 4.0;           // park_max_torque (YAML) [N·m]
+        double parkSpeed_ = 10.0 * M_PI / 180.0;  // park_speed (YAML, deg/s) [rad/s]
+        VM2  parkHoldCommand_ = VM2::Zero();   // current joint-angle hold command, ramps toward qCalibration
+        bool parkHoldArrived_ = false;
+        // Task-space park hold — superseded (see parkStiffness() comment above), kept for
+        // reference only. Not loaded from YAML any more; park_stiffness/park_damping now
+        // mean the joint-space quantities above.
+        // double parkSmoothStiffness_ = 250.0;  // N/m
+        // double parkSmoothDamping_ = 20.0;     // N*s/m
+        // VM2  parkSmoothPos_    = VM2::Zero();
+        // VM2  parkSmoothVel_    = VM2::Zero();
+        // bool parkSmoothActive_ = false;
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
@@ -424,7 +468,7 @@ class RobotMTR : public Robot {
     static bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
-    double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]
+    double maxEndEffVel   = 2.0;    //!< End-effector speed e-stop [m/s]; YAML maxEndEffVel
     double maxEndEffForce = 20.0;   //!< Max end-effector force (XY) [N]
 
     // ── Cached end-effector state (VX size 2 for FLNLHelper compatibility) ───
@@ -441,7 +485,7 @@ class RobotMTR : public Robot {
     void fillParam(YAML::Node node, std::vector<double> &vec);
 
     // ── Private drive helpers ─────────────────────────────────────────────────
-    setMovementReturnCode_t applyTorque(std::vector<double> torques);
+    setMovementReturnCode_t applyTorque(std::vector<double> torques, bool applyLimitDamping = true);
     setMovementReturnCode_t applyPosition(std::vector<double> positions);
     setMovementReturnCode_t applyVelocity(std::vector<double> velocities);
     VM2 singularityDampingTorque(VM2 q, VM2 dq) const;
