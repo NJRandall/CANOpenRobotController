@@ -190,6 +190,9 @@ class RobotMTR : public Robot {
     setMovementReturnCode_t safetyCheck();
     bool hasSafetyTriggered() const { return safetyTriggered_; }
     void clearSafetyTrigger()       { safetyTriggered_ = false; }  // called on EmergencyStop reset
+    // EmergencyStop reset: clears drive faults and confirms every drive reaches Ready to
+    // Switch On with bus voltage present. Leaves the drives disabled; false if any is not ready.
+    bool recoverDrives();
 
     // ── Calibration ───────────────────────────────────────────────────────────
     void applyCalibration();
@@ -215,6 +218,8 @@ class RobotMTR : public Robot {
     double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
     double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
     double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
+    bool bimanualAsymmetricSpring() const { return bimanualAsymmetricSpring_; }   //!< Reflect follower spring onto leader
+    double bimanualReflectionRatio() const { return bimanualReflectionRatio_; }     //!< Fraction of follower force reflected
     double parkStiffness() const { return parkStiffness_; }   //!< Parked-arm joint hold K [N·m/rad]
     double parkDamping() const { return parkDamping_; }       //!< Parked-arm joint hold D [N·m·s/rad]
     double parkMaxTorque() const { return parkMaxTorque_; }   //!< Parked-arm per-joint torque cap [N·m]
@@ -362,6 +367,8 @@ class RobotMTR : public Robot {
         double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
         double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
         double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
+        bool bimanualAsymmetricSpring_ = false;  // bimanual_asymmetric_spring (YAML)
+        double bimanualReflectionRatio_ = 0.1;   // bimanual_reflection_ratio (YAML) [-]
         double parkStiffness_ = 20.0;          // park_stiffness (YAML) [N·m/rad]
         double parkDamping_ = 1.0;             // park_damping (YAML) [N·m·s/rad]
         double parkMaxTorque_ = 4.0;           // park_max_torque (YAML) [N·m]

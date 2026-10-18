@@ -212,6 +212,10 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         controllerDamping_ = params["controller_damping"].as<double>();
     if (params["align_speed"])
         alignSpeed_ = params["align_speed"].as<double>();
+    if (params["bimanual_asymmetric_spring"])
+        bimanualAsymmetricSpring_ = params["bimanual_asymmetric_spring"].as<bool>();
+    if (params["bimanual_reflection_ratio"])
+        bimanualReflectionRatio_ = params["bimanual_reflection_ratio"].as<double>();
     if (params["park_stiffness"])
         parkStiffness_ = params["park_stiffness"].as<double>();
     if (params["park_damping"])
@@ -231,6 +235,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
                                     "must be finite and >= 0, park_speed > 0");
     if (!std::isfinite(alignSpeed_) || alignSpeed_ <= 0.0)
         throw std::invalid_argument("RobotMTR: align_speed must be finite and > 0");
+    if (!std::isfinite(bimanualReflectionRatio_) || bimanualReflectionRatio_ < 0.0)
+        throw std::invalid_argument("RobotMTR: bimanual_reflection_ratio must be finite and >= 0");
     if (!std::isfinite(controllerStiffness_) || controllerStiffness_ < 0.0 ||
         !std::isfinite(controllerDamping_) || controllerDamping_ < 0.0)
         throw std::invalid_argument("RobotMTR: controller_stiffness and controller_damping "
@@ -432,6 +438,29 @@ std::size_t RobotMTR::probeDriveNodes() const {
 // Drive mode initialisation (same pattern as RobotM3)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// CiA 402 statusword: bits 0-3, 5 and 6 encode the drive state; bit 3 = fault and bit 4 =
+// bus voltage present. Waits for every drive to report the requested state.
+static constexpr int kStatusStateMask       = 0x6F;
+static constexpr int kStatusReadyToSwitchOn = 0x21;
+static constexpr int kStatusOperationEnabled = 0x27;
+static constexpr int kStatusFault           = 0x08;
+static constexpr int kStatusVoltageEnabled  = 0x10;
+
+static bool waitForDriveState(const vector<Joint *> &joints, int state, bool requireVoltage,
+                              int timeoutMs) {
+    for (int elapsed = 0; elapsed <= timeoutMs; elapsed += 10) {
+        bool allReached = true;
+        for (auto p : joints) {
+            const int sw = ((JointMT *)p)->getDriveStatus();
+            allReached = allReached && (sw & kStatusStateMask) == state &&
+                         (!requireVoltage || (sw & kStatusVoltageEnabled));
+        }
+        if (allReached) return true;
+        usleep(10000);
+    }
+    return false;
+}
+
 bool RobotMTR::initTorqueControl() {
     spdlog::debug("RobotMTR: Initialising torque control on all joints.");
     bool ok = true;
@@ -441,11 +470,40 @@ bool RobotMTR::initTorqueControl() {
                           p->getId());
             ok = false;
         }
+        // Never enable onto a stale torque target left over from before a disable/ESTOP.
+        ((JointMT *)p)->setTorque(0.0, false);
         ((JointMT *)p)->readyToSwitchOn();
     }
     usleep(2000);
     for (auto p : joints) ((JointMT *)p)->enable();
+#ifndef NOROBOT
+    if (ok && !waitForDriveState(joints, kStatusOperationEnabled, false, 500)) {
+        for (unsigned int i = 0; i < joints.size(); i++)
+            spdlog::error("MTR {}: Joint {} did not reach Operation Enabled (statusword 0x{:04x}).",
+                          robotName, i, ((JointMT *)joints[i])->getDriveStatus() & 0xFFFF);
+        ok = false;
+    }
+#endif
     return ok;
+}
+
+bool RobotMTR::recoverDrives() {
+    for (auto p : joints) p->resetErrors();          // controlword 0x80: Fault → Switch On Disabled
+    usleep(20000);
+    for (auto p : joints) p->readyToSwitchOn();      // controlword 0x06
+#ifndef NOROBOT
+    if (!waitForDriveState(joints, kStatusReadyToSwitchOn, true, 300)) {
+        for (unsigned int i = 0; i < joints.size(); i++) {
+            const int sw = ((JointMT *)joints[i])->getDriveStatus() & 0xFFFF;
+            spdlog::error("MTR {}: Joint {} not ready after reset (statusword 0x{:04x}{}{}).",
+                          robotName, i, sw,
+                          (sw & kStatusFault) ? ", FAULT" : "",
+                          (sw & kStatusVoltageEnabled) ? "" : ", no bus voltage");
+        }
+        return false;
+    }
+#endif
+    return true;
 }
 
 bool RobotMTR::initPositionControl() {
@@ -677,7 +735,9 @@ void RobotMTR::updateRobot() {
         interactionForces = endEffForces;   // gravity is zero; τ_interaction = τ_motor
     }
 
+    // safetyStop (MTRobotMachine.cpp) turns safetyTriggered_ into an EmergencyStop transition.
     if (safetyCheck() != SUCCESS) {
+        safetyTriggered_ = true;
         disable();
     }
 

@@ -13,6 +13,8 @@ midline_damping_gain: 30  # Mirror-mode midline closing-speed damping [N*s/m]
 controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
 controller_damping: 20  # Damping D for the same controllers [N*s/m]
 align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
+bimanual_asymmetric_spring: false  # Bimanual: reflect a weaker follower spring-damper back onto the leader
+bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader
 park_stiffness: 20  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
 park_damping: 1.0  # Unused arm's hold joint damping [N*m*s/rad] (0 = spring only)
 park_max_torque: 4  # Unused arm's hold torque cap per joint [N*m]
