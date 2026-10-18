@@ -1035,7 +1035,7 @@ RobotMTR::setEndEffForceWithCompensation(VM2 F, bool friction_comp,
         for (unsigned int i = 0; i < joints.size(); i++) {
             double dq = ((JointMT *)joints[i])->getVelocity();
             if (std::abs(dq) > threshold)
-                tau(i) += frictionCoul[i] * sign(dq) + frictionVis[i] * dq;
+                tau(i) += frictionScale_ * (frictionCoul[i] * sign(dq) + frictionVis[i] * dq);
         }
     }
 

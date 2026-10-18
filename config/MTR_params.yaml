@@ -1,23 +1,23 @@
 auto_calibration: false  # true=automatic drive-to-stop; false=manual calibration
-collision_avoidance: false  # true=predictive hitbox avoidance; false=horizontal end-effector X avoidance
+collision_avoidance: true  # true=predictive hitbox avoidance; false=horizontal end-effector X avoidance
 collision_log_only: false  # true=compute and print avoidance torques but never apply them
 collision_prediction_horizon: 0.15  # Constant-velocity prediction horizon [s]
-collision_influence_distance: 0.15  # Hitbox clearance or horizontal EE X separation [m]
-collision_spring_gain: 2  # Exponential spring gain [N]
+collision_influence_distance: 0.08  # Hitbox clearance or horizontal EE X separation [m]
+collision_spring_gain: 3  # Exponential spring gain [N]
 collision_decay_length: 0.05  # Exponential spring length scale [m]
-collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
+collision_damping_gain: 3.0  # Closing-speed damping gain [N*s/m]
 midline_influence_distance: 0.08  # Mirror mode: leader is pushed back within this of the midline x=0 [m]
 midline_spring_gain: 1.0  # Mirror-mode midline exponential spring gain [N] (~13 N at the line)
 midline_decay_length: 0.03  # Mirror-mode midline spring length scale [m]
 midline_damping_gain: 30  # Mirror-mode midline closing-speed damping [N*s/m]
-controller_stiffness: 200  # Spring K at 100% assistance for mimic/mirror tracking [N/m]; 20 N cap reached at 20/K m error
-controller_damping: 25  # Damping D for the same controllers [N*s/m] (not scaled by assistance)
+controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
+controller_damping: 20  # Damping D for the same controllers [N*s/m]
 align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
-bimanual_asymmetric_spring: false  # Bimanual: reflect a weaker follower spring-damper back onto the leader
+bimanual_asymmetric_spring: true  # Bimanual: reflect a weaker follower spring-damper back onto the leader
 bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader
-park_stiffness: 40  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
+park_stiffness: 20  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
 park_damping: 1.0  # Unused arm's hold joint damping [N*m*s/rad] (0 = spring only)
-park_max_torque: 8  # Unused arm's hold torque cap per joint [N*m]
+park_max_torque: 4  # Unused arm's hold torque cap per joint [N*m]
 park_speed: 10  # Speed the hold target moves to qCalibration [deg/s]
 
 v1_unit:
@@ -29,7 +29,7 @@ v1_unit:
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 10  # Maximum commanded joint torque [N*m]
+  tauMax: 20  # Maximum commanded joint torque [N*m]
   tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Joint-limit damping band [deg]
   qDampingGain: 0.0  # Joint-limit damping gain [N*m*s/rad] (same on both units)
@@ -43,10 +43,10 @@ v1_unit:
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.20  # Short parallel-link length [m]
     joint_radius: 0.06  # Joint collision radius [m]
-    end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
+    end_effector_radius: 0.06  # End-effector circle radius [m]
     frame:
-      center_x: 0.246  # Frame center x relative to base [m]
-      center_y: 0.1175  # Frame center y relative to base [m]
+      center_x: 0.0  # Frame centre x in this unit's local axes: centred on the shoulder [m]
+      center_y: -0.1845  # Frame centre y in local axes: front edge on the task origin line y=0, 0.235 deep behind it [m]
       width: 0.49  # Frame width [m]
       height: 0.235  # Frame height [m]
       boundary: 0.05  # Frame clearance [m]
@@ -87,10 +87,10 @@ v2_unit:
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.195  # Short parallel-link length [m]
     joint_radius: 0.03  # Joint collision radius [m]
-    end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
+    end_effector_radius: 0.06  # End-effector circle radius [m]
     frame:
-      center_x: 0.246  # Frame center x relative to base [m]
-      center_y: 0.1175  # Frame center y relative to base [m]
+      center_x: 0.0  # Frame centre x in this unit's local axes: centred on the shoulder [m]
+      center_y: -0.1845  # Frame centre y in local axes: front edge on the task origin line y=0, 0.235 deep behind it [m]
       width: 0.49  # Frame width [m]
       height: 0.235  # Frame height [m]
       boundary: 0.05  # Frame clearance [m]

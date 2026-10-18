@@ -220,6 +220,14 @@ class RobotMTR : public Robot {
     double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
     bool bimanualAsymmetricSpring() const { return bimanualAsymmetricSpring_; }   //!< Reflect follower spring onto leader
     double bimanualReflectionRatio() const { return bimanualReflectionRatio_; }     //!< Fraction of follower force reflected
+    //! Live tuning (GUI slider), starting from the YAML values. Ratio 0 switches the asymmetric spring off; any positive ratio switches it on.
+    void setBimanualReflection(double ratio) {
+        bimanualReflectionRatio_ = std::max(0.0, ratio);
+        bimanualAsymmetricSpring_ = ratio > 0.0;
+    }
+    //! Share (0-1) of the YAML friction model applied by friction compensation (GUI slider).
+    double frictionScale() const { return frictionScale_; }
+    void setFrictionScale(double scale) { frictionScale_ = std::min(1.0, std::max(0.0, scale)); }
     double parkStiffness() const { return parkStiffness_; }   //!< Parked-arm joint hold K [N·m/rad]
     double parkDamping() const { return parkDamping_; }       //!< Parked-arm joint hold D [N·m·s/rad]
     double parkMaxTorque() const { return parkMaxTorque_; }   //!< Parked-arm per-joint torque cap [N·m]
@@ -332,6 +340,7 @@ class RobotMTR : public Robot {
     // Friction model — zero until system identification; see MTR_params.yaml
     std::vector<double> frictionVis  = {0.0, 0.0};   //!< Viscous  [N·m·s/rad]
     std::vector<double> frictionCoul = {0.0, 0.0};   //!< Coulomb  [N·m]
+    double frictionScale_ = 1.0;                      //!< Applied share of the model above
 
     // Joint limits [rad] layout: {θ1_min, θ1_max, θ2_min, θ2_max}
     // TODO: LIMITS REMOVED NEED TO BE REINSTATED ONCE HARDWARE VERIFIED — see MTR_params.yaml
