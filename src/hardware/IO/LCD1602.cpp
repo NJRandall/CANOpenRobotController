@@ -72,21 +72,31 @@ void LCD1602::threadFunc() {
     while (running_) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));  // 10 Hz
 
-        std::lock_guard<std::mutex> lock(bufMutex_);
-        if (!dirty_) continue;
+        // Snapshot the buffer under the lock, then write it out unlocked: a full I2C refresh
+        // takes ~40 ms, and print()/charAt() are called from the 2 ms control loop, which must
+        // never wait on it. Writes made during the refresh set dirty_ again for the next pass.
+        char rows[2][16];
+        bool force;
+        {
+            std::lock_guard<std::mutex> lock(bufMutex_);
+            if (!dirty_) continue;
+            memcpy(rows[0], buffer_[0], 16);
+            memcpy(rows[1], buffer_[1], 16);
+            force = forceRewrite_;
+            dirty_ = forceRewrite_ = false;
+        }
 
         // Write only rows that changed to minimise I2C traffic
         static const uint8_t rowAddr[2] = {0x00, 0x40};
         for (int row = 0; row < 2; row++) {
-            if (memcmp(buffer_[row], displayed_[row], 16) == 0) continue;
+            if (!force && memcmp(rows[row], displayed_[row], 16) == 0) continue;
 #ifndef NOROBOT
             sendCmd(0x80 | rowAddr[row]);
             for (int col = 0; col < 16; col++)
-                sendData((uint8_t)buffer_[row][col]);
+                sendData((uint8_t)rows[row][col]);
 #endif
-            memcpy(displayed_[row], buffer_[row], 16);
+            memcpy(displayed_[row], rows[row], 16);
         }
-        dirty_ = false;
     }
 }
 
@@ -122,11 +132,9 @@ void LCD1602::init() {
 
 void LCD1602::clear() {
     std::lock_guard<std::mutex> lock(bufMutex_);
-    for (int r = 0; r < 2; r++) {
+    for (int r = 0; r < 2; r++)
         memset(buffer_[r], ' ', 16);
-        // Force full rewrite by invalidating the displayed snapshot
-        memset(displayed_[r], '\0', 16);
-    }
+    forceRewrite_ = true;   // full rewrite on the next flush
     dirty_ = true;
 }
 
@@ -161,6 +169,6 @@ void LCD1602::setBacklight(bool on) {
     std::lock_guard<std::mutex> lock(bufMutex_);
     backlightOn = on;
     // Force a flush so the backlight bit updates on the next write
-    memset(displayed_, '\0', sizeof(displayed_));
+    forceRewrite_ = true;
     dirty_ = true;
 }

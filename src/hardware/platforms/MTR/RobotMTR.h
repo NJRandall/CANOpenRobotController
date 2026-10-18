@@ -416,7 +416,7 @@ class RobotMTR : public Robot {
     static bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
-    double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]
+    double maxEndEffVel   = 2.0;    //!< End-effector speed e-stop [m/s]; YAML maxEndEffVel
     double maxEndEffForce = 20.0;   //!< Max end-effector force (XY) [N]
 
     // ── Cached end-effector state (VX size 2 for FLNLHelper compatibility) ───

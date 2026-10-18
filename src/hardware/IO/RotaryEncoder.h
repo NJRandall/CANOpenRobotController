@@ -40,6 +40,12 @@ class RotaryEncoder : public InputDevice {
     bool isPressed()     const { return pressEvent; }
     bool isLongPressed() const { return longPressEvent; }
 
+    // Software encoder events (e.g. GUI buttons), reported this cycle exactly like the
+    // hardware's. Call after updateInput(), which clears the events every cycle.
+    void injectRotation(int steps) { rotation += steps; }
+    void injectPress()             { pressEvent = true; }
+    void injectLongPress()         { longPressEvent = true; }
+
     double longPressThreshold = 2.0;  //!< Seconds held before long-press fires
     int    debounceCount      = 10;   //!< Consecutive stable samples needed (×cycle time)
 

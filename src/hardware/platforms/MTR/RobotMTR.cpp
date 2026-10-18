@@ -348,6 +348,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
 
     // Safety envelope
     if (p["maxEndEffForce"]) maxEndEffForce = max(0., p["maxEndEffForce"].as<double>());
+    // Speed e-stop: floored so a zero or negative entry cannot trip it every cycle
+    if (p["maxEndEffVel"])   maxEndEffVel   = max(0.1, p["maxEndEffVel"].as<double>());
 
     fillParam(p["qSigns"],       qSigns);
     fillParam(p["iPeakDrives"],  iPeakDrives);
@@ -462,6 +464,20 @@ static bool waitForDriveState(const vector<Joint *> &joints, int state, bool req
 }
 
 bool RobotMTR::initTorqueControl() {
+    // Already in torque mode and Operation Enabled (e.g. every state change after the first):
+    // the SDO mode writes and the disable/enable cycle below would only stall the control
+    // loop for tens of ms per robot, so just drop any stale torque target.
+    bool alreadyEnabled = !joints.empty();
+    for (auto p : joints) {
+        auto *joint = (JointMT *)p;
+        alreadyEnabled = alreadyEnabled && joint->inTorqueMode() &&
+                         (joint->getDriveStatus() & kStatusStateMask) == kStatusOperationEnabled;
+    }
+    if (alreadyEnabled) {
+        for (auto p : joints) ((JointMT *)p)->setTorque(0.0, false);
+        return true;
+    }
+
     spdlog::debug("RobotMTR: Initialising torque control on all joints.");
     bool ok = true;
     for (auto p : joints) {

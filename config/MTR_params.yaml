@@ -10,14 +10,14 @@ midline_influence_distance: 0.08  # Mirror mode: leader is pushed back within th
 midline_spring_gain: 1.0  # Mirror-mode midline exponential spring gain [N] (~13 N at the line)
 midline_decay_length: 0.03  # Mirror-mode midline spring length scale [m]
 midline_damping_gain: 30  # Mirror-mode midline closing-speed damping [N*s/m]
-controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
-controller_damping: 20  # Damping D for the same controllers [N*s/m]
+controller_stiffness: 200  # Spring K at 100% assistance for mimic/mirror tracking [N/m]; 20 N cap reached at 20/K m error
+controller_damping: 25  # Damping D for the same controllers [N*s/m] (not scaled by assistance)
 align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
 bimanual_asymmetric_spring: false  # Bimanual: reflect a weaker follower spring-damper back onto the leader
 bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader
-park_stiffness: 20  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
+park_stiffness: 40  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
 park_damping: 1.0  # Unused arm's hold joint damping [N*m*s/rad] (0 = spring only)
-park_max_torque: 4  # Unused arm's hold torque cap per joint [N*m]
+park_max_torque: 8  # Unused arm's hold torque cap per joint [N*m]
 park_speed: 10  # Speed the hold target moves to qCalibration [deg/s]
 
 v1_unit:
@@ -29,8 +29,8 @@ v1_unit:
   L2: 0.37  # Distal link length [m]
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 30  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 30  # Measured joint torque stop threshold [N*m]
+  tauMax: 10  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Joint-limit damping band [deg]
   qDampingGain: 0.0  # Joint-limit damping gain [N*m*s/rad] (same on both units)
   singularityDampingAngleExtended: 20.0  # Damping band before the extended elbow stop [deg]
@@ -62,6 +62,7 @@ v1_unit:
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
+  maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
 
 v2_unit:
   task_origin: [-0.265, -0.067]  # Shared task-frame origin (centre between shoulders) seen from this shoulder, local axes [m]
@@ -73,7 +74,7 @@ v2_unit:
   parallel_ratio: 1.0  # Parallel linkage ratio
   dqMax: 200  # Maximum joint speed [deg/s]
   tauMax: 30  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
+  tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 15.0  # Joint-limit damping band [deg]
   qDampingGain: 25.0  # Joint-limit damping gain [N*m*s/rad]
   singularityDampingAngleExtended: 20.0  # Damping band before the extended elbow stop [deg]
@@ -105,3 +106,4 @@ v2_unit:
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
+  maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
