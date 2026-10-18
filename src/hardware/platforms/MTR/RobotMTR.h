@@ -36,12 +36,12 @@
  *
  * Drive hardware
  * ──────────────
- *   2 × Copley ACK-055-06 drives on CAN bus (node IDs 1 and 3), each driving a
- *   Maxon EC60 BLDC motor through a 1:15 gearbox.
- *   VERIFIED: 0x6076 (Motor Rated Torque) = 319 mN·m = 2.795 A × 0.114 N·m/A.
- *   JointMT applies the per-joint reductionRatios from MTR_params.yaml (15 by default)
- *   so all joint-level values are in output-shaft
- *   units: positions [rad], velocities [rad/s], torques [N·m at joint].
+ *   2 × Copley ACK-055-06 drives per unit on CAN bus. Node IDs, motor model/torque
+ *   constant, and gearbox ratio differ between the two prototypes — see each unit's
+ *   drive_node_ids / motorCstt / reductionRatios in MTR_params.yaml, not fixed here.
+ *   JointMT applies the per-joint reductionRatios from MTR_params.yaml so all
+ *   joint-level values are in output-shaft units: positions [rad], velocities [rad/s],
+ *   torques [N·m at joint].
  *
  * Workspace joint limits (System Modelling/ROM (1).m, accelCalc (1).m)
  * ────────────────────────────────────────────────────────────────────
@@ -133,11 +133,17 @@ class RobotMTR : public Robot {
     ~RobotMTR();
 
     bool isMaster() const { return isMaster_; }
+    const std::string &getName() const { return robotName; }   //!< YAML unit name, e.g. "v1_unit"
 
-    // Builds the real Keyboard/RotaryEncoder/LCD1602 hardware and marks this unit as
-    // master. Called once by MTRobotMachine::init(), after it knows which unit is at
-    // index 0.
-    void becomeMaster();
+    // Stop this unit reading the shared keyboard/encoder/mouse, so they are updated once per
+    // cycle by the unit that owns the UI (active robot 0). The shared LCD is kept for display.
+    void releaseUserInputs();
+
+    // Two-BeagleBone configuration only — builds the real Keyboard/RotaryEncoder/LCD1602
+    // hardware and marks this unit as master, once MTRobotMachine::init() knows which unit
+    // is at index 0. Not called in the current single-board setup (see the constructor);
+    // kept in case a future configuration needs it again.
+    // void becomeMaster();
 
     Keyboard      *keyboard = nullptr;  //!< Keyboard input (fallback / development) — master only
     RotaryEncoder *encoder  = nullptr;  //!< KY-040 rotary encoder (S1/CLK=P8_11, S2/DT=P8_12, Key/SW=P8_15) — master only
@@ -198,6 +204,9 @@ class RobotMTR : public Robot {
     double collisionSpringGain() const { return collisionSpringGain_; }
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
+    double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
+    double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
+    double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
     bool collisionLogOnly() const { return collisionLogOnly_; }
     double parkStiffness() const { return parkStiffness_; }
     double parkDamping() const { return parkDamping_; }
@@ -205,11 +214,23 @@ class RobotMTR : public Robot {
     bool driveLivenessLogOnly() const { return driveLivenessLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
-    /** 2×2 planar Jacobian. */
+    /** 2×2 planar Jacobian in this robot's local (shoulder) frame. */
     Eigen::Matrix2d J();
 
-    /** 2R planar forward kinematics → end-effector position (x, y). */
+    /** Forward kinematics → end-effector position (x, y) in the shared task frame. */
     VM2 directKinematic(VM2 q);
+
+    // ── Shared task frame ─────────────────────────────────────────────────────
+    // Every task-space quantity this class exposes (end-effector position, velocity, force,
+    // setEndEffForce* input) is in one frame shared by both units: origin at the centre
+    // between the two shoulder joints, common x/y axes. task_origin (YAML) is that origin's
+    // position seen from this robot's shoulder in its local axes; task_mirror_x (mirror-image
+    // arm) reverses the local x axis and task_yaw then rotates it into the shared axes. The
+    // defaults (origin at the shoulder, no mirror, no rotation) reproduce the old local frame.
+    VM2 toTaskFrame(const VM2 &localPoint) const  { return taskRotation_ * (localPoint - taskOrigin_); }
+    VM2 fromTaskFrame(const VM2 &taskPoint) const { return taskRotation_.transpose() * taskPoint + taskOrigin_; }
+    VM2 toTaskVector(const VM2 &localVector) const  { return taskRotation_ * localVector; }
+    VM2 fromTaskVector(const VM2 &taskVector) const { return taskRotation_.transpose() * taskVector; }
 
     /** Returns VM2::Zero() — horizontal plane, gravity is perpendicular. */
     VM2 calculateGravityTorques();
@@ -242,7 +263,8 @@ class RobotMTR : public Robot {
     const VX &getEndEffForce();
     const VX &getInteractionForce();
 
-    void printStatus();
+    void printStatus(const char *role = nullptr);   //!< Prefixed with [unit role]
+    void printSingularityStatus();                  //!< Elbow angle and singularity damping torque
     void printJointStatus();
 
    private:
@@ -255,11 +277,10 @@ class RobotMTR : public Robot {
     double L1             = 0.43;   //!< Proximal link [m]  (MUST VERIFY)
     double L2             = 0.37;   //!< Distal   link [m]  (MUST VERIFY)
     double parallel_ratio = 1.0;    //!< Joint-2 parallelogram transmission ratio
+    VM2 taskOrigin_ = VM2::Zero();                                 //!< Shared origin in local frame [m]
+    Eigen::Matrix2d taskRotation_ = Eigen::Matrix2d::Identity();  //!< Local → shared axes (may mirror)
 
     // Robot pose and link collision geometry in the shared workspace.
-    double collisionBaseX = 0.0;                 //!< Shoulder x position [m]
-    double collisionBaseY = 0.0;                 //!< Shoulder y position [m]
-    double collisionBaseYaw = 0.0;               //!< Robot base rotation [rad]
     double collisionLinkThickness = 0.08;        //!< Link diameter [m]
     double collisionBoundary = 0.02;             //!< Extra clearance [m]
     double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
@@ -280,6 +301,11 @@ class RobotMTR : public Robot {
     double singularityDampingAngleExtended = 15.0 * M_PI / 180.0; //!< Extended singularity band [rad]
     double singularityDampingAngleFolded   = 15.0 * M_PI / 180.0; //!< Folded singularity band [rad]
     double singularityDampingGain          = 0.5;                 //!< Singularity viscous gain [N·m·s/rad]
+    // Elbow angles (q2 - q1) of the mechanical stops that keep the elbow off its singularities.
+    // Each damping band ramps from zero at (stop ± band) to full gain at the stop. The defaults
+    // are the singularities themselves (0 and 180 deg).
+    double singularityExtendedStop         = 0.0;                 //!< Extended elbow stop [rad]
+    double singularityFoldedStop           = M_PI;                //!< Folded elbow stop [rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
     std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint
@@ -324,6 +350,9 @@ class RobotMTR : public Robot {
         double parkDamping_ = 20.0;     // N*s/m
         double driveLivenessTimeoutS_ = 0.3;  // s — CAN silence before a drive node is treated as lost
         bool driveLivenessLogOnly_ = false;   // true=log would-be timeouts without triggering EmergencyStop
+        double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
+        double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
+        double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
@@ -331,7 +360,20 @@ class RobotMTR : public Robot {
     int  calibGraceCycles_ = 0;   // skip position limits for N cycles after applyCalibration()
     bool safetyTriggered_ = false; // true while robot is disabled due to a safety event
     std::shared_ptr<LCD1602> lcdOwner_;   // keeps the shared LCD alive while this unit exists
-    bool isMaster_        = false; // set true by becomeMaster(); starts as a CAN-only listener
+    // Two-BeagleBone configuration (master + listener on separate boards, deciding which
+    // unit owns UI hardware only after CAN detection — see becomeMaster() below) — not the
+    // current hardware setup (always one BeagleBone running both units), kept for reference
+    // in case a future configuration needs it again.
+    // bool isMaster_        = false; // set true by becomeMaster(); starts as a CAN-only listener
+
+    // Current setup: always one BeagleBone, both units' RobotMTR objects in one process.
+    // Every unit defaults to isMaster_=true and attempts construction; the static weak_ptr
+    // pattern in the constructor means only the first one actually allocates the shared
+    // Keyboard/Encoder/Mouse/LCD, and later ones just get a reference to the same objects.
+    std::shared_ptr<Keyboard> keyboardOwner_;     // shared UI inputs, one object per board
+    std::shared_ptr<RotaryEncoder> encoderOwner_;
+    std::shared_ptr<USBMouse> mouseOwner_;
+    bool isMaster_        = true; // true: constructs keyboard/encoder/lcd; false: CAN-only listener
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
     // IMU disabled — not in use for now. Uncomment to re-enable.
@@ -351,6 +393,11 @@ class RobotMTR : public Robot {
     // Startup presence: checkDriveAlive() (probeDriveNodes()). Ongoing silence:
     // monitored passively by MTRobotMachine::pollDriveMonitor() — see triggerSafetyStop().
     std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
+    double lastSaturationWarn_ = 0.0;   // time of the last force-saturation warning [s]
+    int saturationCount_ = 0;           // saturated cycles since that warning
+    // livenessCheckCounter_/livenessCheckPeriod_ (the old per-cycle SDO-polling liveness
+    // check) deliberately dropped — superseded by MTRobotMachine::pollDriveMonitor(), the
+    // passive CAN-frame-based check that avoids the threadtime overflow the SDO version caused.
     static bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
