@@ -255,8 +255,16 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         controllerDamping_ = params["controller_damping"].as<double>();
     if (params["align_speed"])
         alignSpeed_ = params["align_speed"].as<double>();
+    if (params["align_kp"])
+        alignKp_ = params["align_kp"].as<double>();
+    if (params["align_tau_accel"])
+        alignTauAccel_ = params["align_tau_accel"].as<double>();
     if (!std::isfinite(alignSpeed_) || alignSpeed_ <= 0.0)
         throw std::invalid_argument("RobotMTR: align_speed must be finite and > 0");
+    if (!std::isfinite(alignKp_) || alignKp_ <= 0.0)
+        throw std::invalid_argument("RobotMTR: align_kp must be finite and > 0");
+    if (!std::isfinite(alignTauAccel_) || alignTauAccel_ <= 0.0)
+        throw std::invalid_argument("RobotMTR: align_tau_accel must be finite and > 0");
     if (!std::isfinite(controllerStiffness_) || controllerStiffness_ < 0.0 ||
         !std::isfinite(controllerDamping_) || controllerDamping_ < 0.0)
         throw std::invalid_argument("RobotMTR: controller_stiffness and controller_damping "

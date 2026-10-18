@@ -13,9 +13,13 @@ drive_liveness_timeout: 0.3  # [s] CAN silence before a drive is treated as lost
     # runs every 2ms (controlLoopPeriodInms, application.h), so keep this well above
     # normal PDO jitter to avoid false positives.
 drive_liveness_log_only: false  # true=log would-be liveness timeouts without triggering EmergencyStop
-controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
+controller_stiffness: 250  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error.
+    # Thursday-tested value was 100 — kept at the value already active before this was wired in;
+    # switch to 100 (or re-tune) once validated on hardware.
 controller_damping: 20  # Damping D for the same controllers [N*s/m]
-align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
+align_speed: 0.05  # Max speed of the catch-up term only when easing the target into a mirror/parked reference [m/s]; never caps steady tracking once caught up
+align_kp: 5.0  # Catch-up proportional gain: catch-up speed = min(align_kp * position_error, align_speed) [1/s]
+align_tau_accel: 0.15  # Time constant smoothing velocity toward its commanded value, bounding acceleration during catch-up [s]
 
 v1_unit:  # Prototype 1
   arm_side: "L"  # Left/Right mounting — IMU detection is disabled for now, so set per the physical setup

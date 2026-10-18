@@ -151,17 +151,13 @@ class RobotMTR : public Robot {
     USBMouse      *mouse    = nullptr;  //!< Optional local USB mouse (/dev/input/mouse0) — master only
 
     // ── Device orientation (Left/Right) ───────────────────────────────────────
-    // Only the master reads an IMU: master and listener are two separate BeagleBones, and I2C
-    // is a local bus (not networked), so the master's process can't read a listener-side IMU
-    // directly anyway. In this project's fixed bimanual mount the two arms are necessarily
-    // mounted 180° apart, so the listener's side is simply the logical opposite of whatever
-    // the master's IMU reads — no second reading is needed for the configurations this
-    // project currently supports.
-    // FUTURE EXTENSION: if a configuration ever needs the listener's orientation measured
-    // rather than inferred (e.g. a non-fixed/independent mount), the listener would need its
-    // own local IMU read on its own board and the result sent to the master over the existing
-    // master<->listener channel — a second I2CMPU6050IMU here would not be reachable from the
-    // master's process. See setArmSide() below for how that result would be applied.
+    // Only the master would read an IMU. Both units run in one process on one board, so
+    // this is just about not wiring/reading a second IMU unnecessarily: in this project's
+    // fixed bimanual mount the two arms are necessarily mounted 180° apart, so the
+    // listener's side is simply the logical opposite of whatever the master's IMU reads.
+    // FUTURE EXTENSION: a configuration where the listener's orientation isn't just the
+    // master's logical opposite (e.g. a non-fixed/independent mount) would need its own
+    // IMU read and a way to get that result here — see setArmSide() below.
     ArmSide armSide() const { return armSide_; }
 
     /** Manually set this robot's side — used to apply the listener's inferred (not measured)
@@ -206,12 +202,34 @@ class RobotMTR : public Robot {
     double collisionDampingGain() const { return collisionDampingGain_; }
     double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
     double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
-    double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
+    double alignSpeed() const { return alignSpeed_; }   //!< Max catch-up speed when easing the target into a reference pose [m/s]
+    double alignKp() const { return alignKp_; }         //!< Catch-up proportional gain [1/s]
+    double alignTauAccel() const { return alignTauAccel_; }   //!< Velocity smoothing time constant during catch-up [s]
     bool collisionLogOnly() const { return collisionLogOnly_; }
     double parkStiffness() const { return parkStiffness_; }
     double parkDamping() const { return parkDamping_; }
     double driveLivenessTimeout() const { return driveLivenessTimeoutS_; }
     bool driveLivenessLogOnly() const { return driveLivenessLogOnly_; }
+
+    // ── Parked-arm hold smoothing (see trackSmoothly()/holdParkedRobot() in
+    // MTRobotStates.cpp) ── Kept here rather than on any one State class, since
+    // parking continues across several states (UniModeDecisionState ->
+    // ReferenceGenerationState -> UniControlState) without resetting. Reset once,
+    // when parking begins; advanced only during the initial catch-up to the parked
+    // pose, then deactivated — see trackSmoothly()'s done/active handoff.
+    VM2  parkSmoothPos()      const { return parkSmoothPos_; }
+    VM2  parkSmoothVelocity() const { return parkSmoothVel_; }
+    bool parkSmoothActive()   const { return parkSmoothActive_; }
+    void setParkSmooth(VM2 pos, VM2 vel, bool active) {
+        parkSmoothPos_ = pos; parkSmoothVel_ = vel; parkSmoothActive_ = active;
+    }
+    // Call once when this unit starts being parked, so the hold target eases in from
+    // its actual current position instead of jumping straight to the calibration pose.
+    void resetParkSmooth() {
+        parkSmoothActive_ = true;
+        parkSmoothPos_ = getEndEffPosition();
+        parkSmoothVel_ = VM2::Zero();
+    }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
     /** 2×2 planar Jacobian in this robot's local (shoulder) frame. */
@@ -348,11 +366,16 @@ class RobotMTR : public Robot {
         double collisionDampingGain_ = 2.0;
         double parkStiffness_ = 250.0;  // N/m — holds the non-follower arm at its calibration pose
         double parkDamping_ = 20.0;     // N*s/m
+        VM2  parkSmoothPos_    = VM2::Zero();
+        VM2  parkSmoothVel_    = VM2::Zero();
+        bool parkSmoothActive_ = false;
         double driveLivenessTimeoutS_ = 0.3;  // s — CAN silence before a drive node is treated as lost
         bool driveLivenessLogOnly_ = false;   // true=log would-be timeouts without triggering EmergencyStop
         double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
         double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
         double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
+        double alignKp_ = 5.0;                  // align_kp (YAML) [1/s]
+        double alignTauAccel_ = 0.15;           // align_tau_accel (YAML) [s]
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
