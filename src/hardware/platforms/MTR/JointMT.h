@@ -71,6 +71,8 @@ class JointMT : public Joint {
     setMovementReturnCode_t setPosition(double qd);
     setMovementReturnCode_t setVelocity(double dqd);
     setMovementReturnCode_t setTorque(double taud);
+    /** As setTorque(); applyLimitDamping=false skips the soft-limit damping (stop cut-off kept). */
+    setMovementReturnCode_t setTorque(double taud, bool applyLimitDamping);
 
     bool initNetwork();
 };

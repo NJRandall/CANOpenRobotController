@@ -207,14 +207,38 @@ class RobotMTR : public Robot {
     double collisionSpringGain() const { return collisionSpringGain_; }
     double collisionDecayLength() const { return collisionDecayLength_; }
     double collisionDampingGain() const { return collisionDampingGain_; }
+    // Mirror-mode midline (x = 0) collision line for the leader
+    double midlineInfluenceDistance() const { return midlineInfluenceDistance_; }
+    double midlineSpringGain() const { return midlineSpringGain_; }
+    double midlineDecayLength() const { return midlineDecayLength_; }
+    double midlineDampingGain() const { return midlineDampingGain_; }
+    double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
+    double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
+    double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
+    double parkStiffness() const { return parkStiffness_; }   //!< Parked-arm joint hold K [N·m/rad]
+    double parkDamping() const { return parkDamping_; }       //!< Parked-arm joint hold D [N·m·s/rad]
+    double parkMaxTorque() const { return parkMaxTorque_; }   //!< Parked-arm per-joint torque cap [N·m]
+    double parkSpeed() const { return parkSpeed_; }           //!< Parked-arm joint target speed [rad/s]
     bool collisionLogOnly() const { return collisionLogOnly_; }
 
     // ── Kinematics & dynamics ─────────────────────────────────────────────────
-    /** 2×2 planar Jacobian. */
+    /** 2×2 planar Jacobian in this robot's local (shoulder) frame. */
     Eigen::Matrix2d J();
 
-    /** 2R planar forward kinematics → end-effector position (x, y). */
+    /** Forward kinematics → end-effector position (x, y) in the shared task frame. */
     VM2 directKinematic(VM2 q);
+
+    // ── Shared task frame ─────────────────────────────────────────────────────
+    // Every task-space quantity this class exposes (end-effector position, velocity, force,
+    // setEndEffForce* input) is in one frame shared by both units: origin at the centre
+    // between the two shoulder joints, common x/y axes. task_origin (YAML) is that origin's
+    // position seen from this robot's shoulder in its local axes; task_mirror_x (mirror-image
+    // arm) reverses the local x axis and task_yaw then rotates it into the shared axes. The
+    // defaults (origin at the shoulder, no mirror, no rotation) reproduce the old local frame.
+    VM2 toTaskFrame(const VM2 &localPoint) const  { return taskRotation_ * (localPoint - taskOrigin_); }
+    VM2 fromTaskFrame(const VM2 &taskPoint) const { return taskRotation_.transpose() * taskPoint + taskOrigin_; }
+    VM2 toTaskVector(const VM2 &localVector) const  { return taskRotation_ * localVector; }
+    VM2 fromTaskVector(const VM2 &taskVector) const { return taskRotation_.transpose() * taskVector; }
 
     /** Returns VM2::Zero() — horizontal plane, gravity is perpendicular. */
     VM2 calculateGravityTorques();
@@ -230,7 +254,8 @@ class RobotMTR : public Robot {
 
     // ── Joint-space setters ───────────────────────────────────────────────────
     setMovementReturnCode_t setJointTorque(VM2 tau,
-                                            bool applySingularityDamping = true);
+                                            bool applySingularityDamping = true,
+                                            bool applyLimitDamping = true);
     setMovementReturnCode_t setJointPosition(VM2 q);
     setMovementReturnCode_t setJointVelocity(VM2 dq);
 
@@ -247,7 +272,8 @@ class RobotMTR : public Robot {
     const VX &getEndEffForce();
     const VX &getInteractionForce();
 
-    void printStatus();
+    void printStatus(const char *role = nullptr);   //!< Prefixed with [unit role]
+    void printSingularityStatus();                  //!< Elbow angle and singularity damping torque
     void printJointStatus();
 
    private:
@@ -260,11 +286,10 @@ class RobotMTR : public Robot {
     double L1             = 0.43;   //!< Proximal link [m]  (MUST VERIFY)
     double L2             = 0.37;   //!< Distal   link [m]  (MUST VERIFY)
     double parallel_ratio = 1.0;    //!< Joint-2 parallelogram transmission ratio
+    VM2 taskOrigin_ = VM2::Zero();                                 //!< Shared origin in local frame [m]
+    Eigen::Matrix2d taskRotation_ = Eigen::Matrix2d::Identity();  //!< Local → shared axes (may mirror)
 
     // Robot pose and link collision geometry in the shared workspace.
-    double collisionBaseX = 0.0;                 //!< Shoulder x position [m]
-    double collisionBaseY = 0.0;                 //!< Shoulder y position [m]
-    double collisionBaseYaw = 0.0;               //!< Robot base rotation [rad]
     double collisionLinkThickness = 0.08;        //!< Link diameter [m]
     double collisionBoundary = 0.02;             //!< Extra clearance [m]
     double collisionLinkALength = 0.0;           //!< Parallel link A length [m]
@@ -285,6 +310,11 @@ class RobotMTR : public Robot {
     double singularityDampingAngleExtended = 15.0 * M_PI / 180.0; //!< Extended singularity band [rad]
     double singularityDampingAngleFolded   = 15.0 * M_PI / 180.0; //!< Folded singularity band [rad]
     double singularityDampingGain          = 0.5;                 //!< Singularity viscous gain [N·m·s/rad]
+    // Elbow angles (q2 - q1) of the mechanical stops that keep the elbow off its singularities.
+    // Each damping band ramps from zero at (stop ± band) to full gain at the stop. The defaults
+    // are the singularities themselves (0 and 180 deg).
+    double singularityExtendedStop         = 0.0;                 //!< Extended elbow stop [rad]
+    double singularityFoldedStop           = M_PI;                //!< Folded elbow stop [rad]
 
     // Per-joint drive parameters (index 0 = proximal/shoulder, index 1 = distal/elbow)
     std::vector<int> driveNodeIds = {1, 3};          //!< CAN node for each joint
@@ -325,6 +355,17 @@ class RobotMTR : public Robot {
         double collisionSpringGain_ = 0.25;
         double collisionDecayLength_ = 0.05;
         double collisionDampingGain_ = 2.0;
+        double midlineInfluenceDistance_ = 0.08;   // midline_influence_distance [m]
+        double midlineSpringGain_ = 1.0;           // midline_spring_gain [N]
+        double midlineDecayLength_ = 0.03;         // midline_decay_length [m]
+        double midlineDampingGain_ = 30.0;         // midline_damping_gain [N*s/m]
+        double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
+        double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
+        double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
+        double parkStiffness_ = 20.0;          // park_stiffness (YAML) [N·m/rad]
+        double parkDamping_ = 1.0;             // park_damping (YAML) [N·m·s/rad]
+        double parkMaxTorque_ = 4.0;           // park_max_torque (YAML) [N·m]
+        double parkSpeed_ = 10.0 * M_PI / 180.0;  // park_speed (YAML, deg/s) [rad/s]
         VM2 calibrationDirection_ = VM2(-1.0, -1.0);
         VM2 calibrationTorque_ = VM2(2.6, 2.0);
 
@@ -360,6 +401,8 @@ class RobotMTR : public Robot {
     // than going through Drive/CopleyDrive (shared with other robot platforms).
     std::vector<int> driveNodeIds_;            // copy of the constructor's drive_node_ids
     int livenessCheckCounter_ = 0;
+    double lastSaturationWarn_ = 0.0;   // time of the last force-saturation warning [s]
+    int saturationCount_ = 0;           // saturated cycles since that warning
     static constexpr int livenessCheckPeriod_ = 500;  // TODO: tune — cycles between checks;
                                                        // SDO round-trips are slow/blocking,
                                                        // unlike the PDO-based control traffic
@@ -383,7 +426,7 @@ class RobotMTR : public Robot {
     void fillParam(YAML::Node node, std::vector<double> &vec);
 
     // ── Private drive helpers ─────────────────────────────────────────────────
-    setMovementReturnCode_t applyTorque(std::vector<double> torques);
+    setMovementReturnCode_t applyTorque(std::vector<double> torques, bool applyLimitDamping = true);
     setMovementReturnCode_t applyPosition(std::vector<double> positions);
     setMovementReturnCode_t applyVelocity(std::vector<double> velocities);
     VM2 singularityDampingTorque(VM2 q, VM2 dq) const;

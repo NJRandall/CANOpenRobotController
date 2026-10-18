@@ -63,6 +63,9 @@ class LCD1602 : public I2CDevice {
     /** Write a single character into the buffer. */
     void printChar(char c);
 
+    /** Character currently in the buffer at (col, row); col ∈ [0,15], row ∈ [0,1]. */
+    char charAt(uint8_t col, uint8_t row);
+
     /** Turn backlight on or off (takes effect at next thread flush). */
     void setBacklight(bool on);
 

@@ -65,19 +65,28 @@ setMovementReturnCode_t JointMT::setVelocity(double dqd) {
 }
 
 setMovementReturnCode_t JointMT::setTorque(double taud) {
+    return setTorque(taud, true);
+}
+
+setMovementReturnCode_t JointMT::setTorque(double taud, bool applyLimitDamping) {
     // Apply soft-limit damping only after calibration, when position is in the
     // calibrated q coordinate system used by qMin and qMax.
-    if (calibrated && qDampingWidth > 0.0 && qDampingGain > 0.0) {
+    if (applyLimitDamping && calibrated && qDampingWidth > 0.0 && qDampingGain > 0.0) {
         double dampingTorque = 0.0;
         double distanceToMin = position - qMin;
         double distanceToMax = qMax - position;
 
         // At the lower stop, negative velocity moves toward qMin, so apply
         // positive opposing torque. At the upper stop, the signs are reversed.
+        // The gain ramps linearly from zero at the band edge to full at the limit
+        // (and stays full beyond it), so the damping builds up instead of switching on.
+        auto ramp = [this](double distance) {
+            return std::clamp(1.0 - distance / qDampingWidth, 0.0, 1.0);
+        };
         if (distanceToMin < qDampingWidth && velocity < 0.0) {
-            dampingTorque = -qDampingGain * velocity;
+            dampingTorque = -qDampingGain * ramp(distanceToMin) * velocity;
         } else if (distanceToMax < qDampingWidth && velocity > 0.0) {
-            dampingTorque = -qDampingGain * velocity;
+            dampingTorque = -qDampingGain * ramp(distanceToMax) * velocity;
         }
 
         // This is viscous damping: it opposes approach velocity but does not
