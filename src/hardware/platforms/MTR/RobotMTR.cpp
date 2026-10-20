@@ -350,6 +350,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
     if (p["maxEndEffForce"]) maxEndEffForce = max(0., p["maxEndEffForce"].as<double>());
     // Speed e-stop: floored so a zero or negative entry cannot trip it every cycle
     if (p["maxEndEffVel"])   maxEndEffVel   = max(0.1, p["maxEndEffVel"].as<double>());
+    // Debounce: a single corrupt drive velocity sample must not trip the speed e-stop
+    if (p["maxEndEffVelCycles"]) maxEndEffVelCycles = max(1, p["maxEndEffVelCycles"].as<int>());
 
     fillParam(p["qSigns"],       qSigns);
     fillParam(p["iPeakDrives"],  iPeakDrives);
@@ -891,10 +893,23 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
                 return OUTSIDE_LIMITS;
             }
         }
-        if (getEndEffVelocity().norm() > maxEndEffVel) {
-            spdlog::error("MTR {}: End-effector velocity limit exceeded ({:.2f} m/s)!", robotName,
-                          getEndEffVelocity().norm());
-            return OUTSIDE_LIMITS;
+        // Velocity comes straight from the drives' actual-velocity PDO, which occasionally
+        // delivers a single absurd sample (thousands of m/s). Only trip when the limit is
+        // exceeded for maxEndEffVelCycles consecutive cycles; a real overspeed lasts far longer.
+        double endEffSpeed = getEndEffVelocity().norm();
+        if (endEffSpeed > maxEndEffVel || !std::isfinite(endEffSpeed)) {
+            endEffVelOverCount_++;
+            if (endEffVelOverCount_ >= maxEndEffVelCycles) {
+                spdlog::error("MTR {}: End-effector velocity limit exceeded ({:.2f} m/s for {} cycles)!",
+                              robotName, endEffSpeed, endEffVelOverCount_);
+                return OUTSIDE_LIMITS;
+            }
+            spdlog::warn("MTR {}: ignoring end-effector velocity spike {:.2f} m/s (dq=[{:.1f} {:.1f}] rad/s), {}/{}",
+                         robotName, endEffSpeed, joints[0]->getVelocity(),
+                         joints.size() > 1 ? joints[1]->getVelocity() : 0.0,
+                         endEffVelOverCount_, maxEndEffVelCycles);
+        } else {
+            endEffVelOverCount_ = 0;
         }
         for (unsigned int i = 0; i < joints.size(); i++) {
             double tau = joints[i]->getTorque();   // joint torque [N·m] — reductionRatios applied

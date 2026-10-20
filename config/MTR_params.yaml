@@ -14,7 +14,7 @@ controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20
 controller_damping: 20  # Damping D for the same controllers [N*s/m]
 align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
 bimanual_asymmetric_spring: true  # Bimanual: reflect a weaker follower spring-damper back onto the leader
-bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader
+bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader [-]
 park_stiffness: 20  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
 park_damping: 1.0  # Unused arm's hold joint damping [N*m*s/rad] (0 = spring only)
 park_max_torque: 4  # Unused arm's hold torque cap per joint [N*m]
@@ -27,7 +27,7 @@ v1_unit:
   drive_node_ids: [2, 3]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
-  parallel_ratio: 1.0  # Parallel linkage ratio
+  parallel_ratio: 1.0  # Parallel linkage ratio [-]
   dqMax: 200  # Maximum joint speed [deg/s]
   tauMax: 20  # Maximum commanded joint torque [N*m]
   tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
@@ -47,15 +47,15 @@ v1_unit:
     frame:
       center_x: 0.0  # Frame centre x in this unit's local axes: centred on the shoulder [m]
       center_y: -0.1845  # Frame centre y in local axes: front edge on the task origin line y=0, 0.235 deep behind it [m]
-      width: 0.49  # Frame width [m]
-      height: 0.235  # Frame height [m]
+      width: 0.49  # Frame size along local x [m]
+      height: 0.235  # Frame size along local y [m]
       boundary: 0.05  # Frame clearance [m]
-  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
-  motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
-  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
-  reductionRatios: [13.3, 13.3]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
-  encoderCounts: [8192, 8192]  # Joint 0 and joint 1 encoder counts per motor revolution (2048 lines x 4)
-  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 rated motor current [A]: 1000 drive torque units = rated torque (0x6076, 0.319 N*m) / motorCstt
+  motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants, motor side [N*m/A]
+  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections [-]
+  reductionRatios: [13.3, 13.3]  # Joint 0 and joint 1 gearbox ratios, motor turns per joint turn [-]
+  encoderCounts: [8192, 8192]  # Joint 0 and joint 1 encoder counts per motor revolution, 2048 lines x 4 [counts/rev]
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs [-]; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-12, 160, 14, 235]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [-10, 140]  # Joint 0 and joint 1 calibration angles [deg]
@@ -63,6 +63,7 @@ v1_unit:
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
   maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
+  maxEndEffVelCycles: 5  # Consecutive over-limit cycles before the speed e-stop trips (5 = 10 ms at 500 Hz)
 
 v2_unit:
   task_origin: [-0.265, -0.067]  # Shared task-frame origin (centre between shoulders) seen from this shoulder, local axes [m]
@@ -71,7 +72,7 @@ v2_unit:
   drive_node_ids: [1, 4]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
-  parallel_ratio: 1.0  # Parallel linkage ratio
+  parallel_ratio: 1.0  # Parallel linkage ratio [-]
   dqMax: 200  # Maximum joint speed [deg/s]
   tauMax: 30  # Maximum commanded joint torque [N*m]
   tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
@@ -91,15 +92,15 @@ v2_unit:
     frame:
       center_x: 0.0  # Frame centre x in this unit's local axes: centred on the shoulder [m]
       center_y: -0.1845  # Frame centre y in local axes: front edge on the task origin line y=0, 0.235 deep behind it [m]
-      width: 0.49  # Frame width [m]
-      height: 0.235  # Frame height [m]
+      width: 0.49  # Frame size along local x [m]
+      height: 0.235  # Frame size along local y [m]
       boundary: 0.05  # Frame clearance [m]
-  iPeakDrives: [4.091, 4.091]  # Rated (CME2 continuous) current [A]: 1000 drive units = 0x6076 (0.945 N*m) / motorCstt
-  motorCstt: [0.231, 0.231]  # Joint 0 and joint 1 motor torque constants [N*m/A]
-  qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections
-  reductionRatios: [11.083, 11.083]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
-  encoderCounts: [16384, 16384]  # Joint 0 and joint 1 encoder counts per motor revolution (4096 lines x 4)
-  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  iPeakDrives: [4.091, 4.091]  # Joint 0 and joint 1 rated motor current [A]: 1000 drive torque units = rated torque (0x6076, 0.945 N*m) / motorCstt
+  motorCstt: [0.231, 0.231]  # Joint 0 and joint 1 motor torque constants, motor side [N*m/A]
+  qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections [-]
+  reductionRatios: [11.083, 11.083]  # Joint 0 and joint 1 gearbox ratios, motor turns per joint turn [-]
+  encoderCounts: [16384, 16384]  # Joint 0 and joint 1 encoder counts per motor revolution, 4096 lines x 4 [counts/rev]
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs [-]; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-17, 160, 8, 235]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [-15.7, 140]  # Joint 0 and joint 1 calibration angles [deg]
@@ -107,3 +108,4 @@ v2_unit:
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
   maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
+  maxEndEffVelCycles: 5  # Consecutive over-limit cycles before the speed e-stop trips (5 = 10 ms at 500 Hz)

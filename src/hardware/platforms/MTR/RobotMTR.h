@@ -426,6 +426,8 @@ class RobotMTR : public Robot {
 
     // ── Safety envelope ───────────────────────────────────────────────────────
     double maxEndEffVel   = 2.0;    //!< End-effector speed e-stop [m/s]; YAML maxEndEffVel
+    int    maxEndEffVelCycles = 5;  //!< Consecutive over-limit cycles before the speed e-stop trips; YAML maxEndEffVelCycles
+    int    endEffVelOverCount_ = 0; //!< Current run of consecutive over-limit cycles
     double maxEndEffForce = 20.0;   //!< Max end-effector force (XY) [N]
 
     // ── Cached end-effector state (VX size 2 for FLNLHelper compatibility) ───
