@@ -212,6 +212,10 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
         controllerDamping_ = params["controller_damping"].as<double>();
     if (params["align_speed"])
         alignSpeed_ = params["align_speed"].as<double>();
+    if (params["bimanual_asymmetric_spring"])
+        bimanualAsymmetricSpring_ = params["bimanual_asymmetric_spring"].as<bool>();
+    if (params["bimanual_reflection_ratio"])
+        bimanualReflectionRatio_ = params["bimanual_reflection_ratio"].as<double>();
     if (params["park_stiffness"])
         parkStiffness_ = params["park_stiffness"].as<double>();
     if (params["park_damping"])
@@ -231,6 +235,8 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
                                     "must be finite and >= 0, park_speed > 0");
     if (!std::isfinite(alignSpeed_) || alignSpeed_ <= 0.0)
         throw std::invalid_argument("RobotMTR: align_speed must be finite and > 0");
+    if (!std::isfinite(bimanualReflectionRatio_) || bimanualReflectionRatio_ < 0.0)
+        throw std::invalid_argument("RobotMTR: bimanual_reflection_ratio must be finite and >= 0");
     if (!std::isfinite(controllerStiffness_) || controllerStiffness_ < 0.0 ||
         !std::isfinite(controllerDamping_) || controllerDamping_ < 0.0)
         throw std::invalid_argument("RobotMTR: controller_stiffness and controller_damping "
@@ -342,6 +348,10 @@ bool RobotMTR::loadParametersFromYAML(YAML::Node params) {
 
     // Safety envelope
     if (p["maxEndEffForce"]) maxEndEffForce = max(0., p["maxEndEffForce"].as<double>());
+    // Speed e-stop: floored so a zero or negative entry cannot trip it every cycle
+    if (p["maxEndEffVel"])   maxEndEffVel   = max(0.1, p["maxEndEffVel"].as<double>());
+    // Debounce: a single corrupt drive velocity sample must not trip the speed e-stop
+    if (p["maxEndEffVelCycles"]) maxEndEffVelCycles = max(1, p["maxEndEffVelCycles"].as<int>());
 
     fillParam(p["qSigns"],       qSigns);
     fillParam(p["iPeakDrives"],  iPeakDrives);
@@ -432,7 +442,44 @@ std::size_t RobotMTR::probeDriveNodes() const {
 // Drive mode initialisation (same pattern as RobotM3)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// CiA 402 statusword: bits 0-3, 5 and 6 encode the drive state; bit 3 = fault and bit 4 =
+// bus voltage present. Waits for every drive to report the requested state.
+static constexpr int kStatusStateMask       = 0x6F;
+static constexpr int kStatusReadyToSwitchOn = 0x21;
+static constexpr int kStatusOperationEnabled = 0x27;
+static constexpr int kStatusFault           = 0x08;
+static constexpr int kStatusVoltageEnabled  = 0x10;
+
+static bool waitForDriveState(const vector<Joint *> &joints, int state, bool requireVoltage,
+                              int timeoutMs) {
+    for (int elapsed = 0; elapsed <= timeoutMs; elapsed += 10) {
+        bool allReached = true;
+        for (auto p : joints) {
+            const int sw = ((JointMT *)p)->getDriveStatus();
+            allReached = allReached && (sw & kStatusStateMask) == state &&
+                         (!requireVoltage || (sw & kStatusVoltageEnabled));
+        }
+        if (allReached) return true;
+        usleep(10000);
+    }
+    return false;
+}
+
 bool RobotMTR::initTorqueControl() {
+    // Already in torque mode and Operation Enabled (e.g. every state change after the first):
+    // the SDO mode writes and the disable/enable cycle below would only stall the control
+    // loop for tens of ms per robot, so just drop any stale torque target.
+    bool alreadyEnabled = !joints.empty();
+    for (auto p : joints) {
+        auto *joint = (JointMT *)p;
+        alreadyEnabled = alreadyEnabled && joint->inTorqueMode() &&
+                         (joint->getDriveStatus() & kStatusStateMask) == kStatusOperationEnabled;
+    }
+    if (alreadyEnabled) {
+        for (auto p : joints) ((JointMT *)p)->setTorque(0.0, false);
+        return true;
+    }
+
     spdlog::debug("RobotMTR: Initialising torque control on all joints.");
     bool ok = true;
     for (auto p : joints) {
@@ -441,11 +488,40 @@ bool RobotMTR::initTorqueControl() {
                           p->getId());
             ok = false;
         }
+        // Never enable onto a stale torque target left over from before a disable/ESTOP.
+        ((JointMT *)p)->setTorque(0.0, false);
         ((JointMT *)p)->readyToSwitchOn();
     }
     usleep(2000);
     for (auto p : joints) ((JointMT *)p)->enable();
+#ifndef NOROBOT
+    if (ok && !waitForDriveState(joints, kStatusOperationEnabled, false, 500)) {
+        for (unsigned int i = 0; i < joints.size(); i++)
+            spdlog::error("MTR {}: Joint {} did not reach Operation Enabled (statusword 0x{:04x}).",
+                          robotName, i, ((JointMT *)joints[i])->getDriveStatus() & 0xFFFF);
+        ok = false;
+    }
+#endif
     return ok;
+}
+
+bool RobotMTR::recoverDrives() {
+    for (auto p : joints) p->resetErrors();          // controlword 0x80: Fault → Switch On Disabled
+    usleep(20000);
+    for (auto p : joints) p->readyToSwitchOn();      // controlword 0x06
+#ifndef NOROBOT
+    if (!waitForDriveState(joints, kStatusReadyToSwitchOn, true, 300)) {
+        for (unsigned int i = 0; i < joints.size(); i++) {
+            const int sw = ((JointMT *)joints[i])->getDriveStatus() & 0xFFFF;
+            spdlog::error("MTR {}: Joint {} not ready after reset (statusword 0x{:04x}{}{}).",
+                          robotName, i, sw,
+                          (sw & kStatusFault) ? ", FAULT" : "",
+                          (sw & kStatusVoltageEnabled) ? "" : ", no bus voltage");
+        }
+        return false;
+    }
+#endif
+    return true;
 }
 
 bool RobotMTR::initPositionControl() {
@@ -677,7 +753,9 @@ void RobotMTR::updateRobot() {
         interactionForces = endEffForces;   // gravity is zero; τ_interaction = τ_motor
     }
 
+    // safetyStop (MTRobotMachine.cpp) turns safetyTriggered_ into an EmergencyStop transition.
     if (safetyCheck() != SUCCESS) {
+        safetyTriggered_ = true;
         disable();
     }
 
@@ -815,10 +893,23 @@ setMovementReturnCode_t RobotMTR::safetyCheck() {
                 return OUTSIDE_LIMITS;
             }
         }
-        if (getEndEffVelocity().norm() > maxEndEffVel) {
-            spdlog::error("MTR {}: End-effector velocity limit exceeded ({:.2f} m/s)!", robotName,
-                          getEndEffVelocity().norm());
-            return OUTSIDE_LIMITS;
+        // Velocity comes straight from the drives' actual-velocity PDO, which occasionally
+        // delivers a single absurd sample (thousands of m/s). Only trip when the limit is
+        // exceeded for maxEndEffVelCycles consecutive cycles; a real overspeed lasts far longer.
+        double endEffSpeed = getEndEffVelocity().norm();
+        if (endEffSpeed > maxEndEffVel || !std::isfinite(endEffSpeed)) {
+            endEffVelOverCount_++;
+            if (endEffVelOverCount_ >= maxEndEffVelCycles) {
+                spdlog::error("MTR {}: End-effector velocity limit exceeded ({:.2f} m/s for {} cycles)!",
+                              robotName, endEffSpeed, endEffVelOverCount_);
+                return OUTSIDE_LIMITS;
+            }
+            spdlog::warn("MTR {}: ignoring end-effector velocity spike {:.2f} m/s (dq=[{:.1f} {:.1f}] rad/s), {}/{}",
+                         robotName, endEffSpeed, joints[0]->getVelocity(),
+                         joints.size() > 1 ? joints[1]->getVelocity() : 0.0,
+                         endEffVelOverCount_, maxEndEffVelCycles);
+        } else {
+            endEffVelOverCount_ = 0;
         }
         for (unsigned int i = 0; i < joints.size(); i++) {
             double tau = joints[i]->getTorque();   // joint torque [N·m] — reductionRatios applied
@@ -959,7 +1050,7 @@ RobotMTR::setEndEffForceWithCompensation(VM2 F, bool friction_comp,
         for (unsigned int i = 0; i < joints.size(); i++) {
             double dq = ((JointMT *)joints[i])->getVelocity();
             if (std::abs(dq) > threshold)
-                tau(i) += frictionCoul[i] * sign(dq) + frictionVis[i] * dq;
+                tau(i) += frictionScale_ * (frictionCoul[i] * sign(dq) + frictionVis[i] * dq);
         }
     }
 

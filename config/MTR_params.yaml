@@ -1,11 +1,11 @@
 auto_calibration: false  # true=automatic drive-to-stop; false=manual calibration
-collision_avoidance: false  # true=predictive hitbox avoidance; false=horizontal end-effector X avoidance
+collision_avoidance: true  # true=predictive hitbox avoidance; false=horizontal end-effector X avoidance
 collision_log_only: false  # true=compute and print avoidance torques but never apply them
 collision_prediction_horizon: 0.15  # Constant-velocity prediction horizon [s]
-collision_influence_distance: 0.15  # Hitbox clearance or horizontal EE X separation [m]
-collision_spring_gain: 2  # Exponential spring gain [N]
+collision_influence_distance: 0.08  # Hitbox clearance or horizontal EE X separation [m]
+collision_spring_gain: 3  # Exponential spring gain [N]
 collision_decay_length: 0.05  # Exponential spring length scale [m]
-collision_damping_gain: 2.0  # Closing-speed damping gain [N*s/m]
+collision_damping_gain: 3.0  # Closing-speed damping gain [N*s/m]
 midline_influence_distance: 0.08  # Mirror mode: leader is pushed back within this of the midline x=0 [m]
 midline_spring_gain: 1.0  # Mirror-mode midline exponential spring gain [N] (~13 N at the line)
 midline_decay_length: 0.03  # Mirror-mode midline spring length scale [m]
@@ -13,6 +13,8 @@ midline_damping_gain: 30  # Mirror-mode midline closing-speed damping [N*s/m]
 controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
 controller_damping: 20  # Damping D for the same controllers [N*s/m]
 align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
+bimanual_asymmetric_spring: true  # Bimanual: reflect a weaker follower spring-damper back onto the leader
+bimanual_reflection_ratio: 0.1  # Fraction of the follower's spring-damper force reflected onto the leader [-]
 park_stiffness: 20  # Unused arm's hold in one-arm operation: joint spring towards qCalibration [N*m/rad]
 park_damping: 1.0  # Unused arm's hold joint damping [N*m*s/rad] (0 = spring only)
 park_max_torque: 4  # Unused arm's hold torque cap per joint [N*m]
@@ -25,10 +27,10 @@ v1_unit:
   drive_node_ids: [2, 3]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
-  parallel_ratio: 1.0  # Parallel linkage ratio
+  parallel_ratio: 1.0  # Parallel linkage ratio [-]
   dqMax: 200  # Maximum joint speed [deg/s]
-  tauMax: 30  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 30  # Measured joint torque stop threshold [N*m]
+  tauMax: 20  # Maximum commanded joint torque [N*m]
+  tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 10.0  # Joint-limit damping band [deg]
   qDampingGain: 0.0  # Joint-limit damping gain [N*m*s/rad] (same on both units)
   singularityDampingAngleExtended: 20.0  # Damping band before the extended elbow stop [deg]
@@ -41,25 +43,27 @@ v1_unit:
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.20  # Short parallel-link length [m]
     joint_radius: 0.06  # Joint collision radius [m]
-    end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
+    end_effector_radius: 0.06  # End-effector circle radius [m]
     frame:
-      center_x: 0.246  # Frame center x relative to base [m]
-      center_y: 0.1175  # Frame center y relative to base [m]
-      width: 0.49  # Frame width [m]
-      height: 0.235  # Frame height [m]
+      center_x: 0.0  # Frame centre x in this unit's local axes: centred on the shoulder [m]
+      center_y: -0.1845  # Frame centre y in local axes: front edge on the task origin line y=0, 0.235 deep behind it [m]
+      width: 0.49  # Frame size along local x [m]
+      height: 0.235  # Frame size along local y [m]
       boundary: 0.05  # Frame clearance [m]
-  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 peak current limits [A]
-  motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants [N*m/A]
-  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections
-  reductionRatios: [13.3, 13.3]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
-  encoderCounts: [8192, 8192]  # Joint 0 and joint 1 encoder counts per motor revolution (2048 lines x 4)
-  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  iPeakDrives: [2.795, 2.795]  # Joint 0 and joint 1 rated motor current [A]: 1000 drive torque units = rated torque (0x6076, 0.319 N*m) / motorCstt
+  motorCstt: [0.114, 0.114]  # Joint 0 and joint 1 motor torque constants, motor side [N*m/A]
+  qSigns: [1, -1]  # Joint 0 and joint 1 direction sign corrections [-]
+  reductionRatios: [13.3, 13.3]  # Joint 0 and joint 1 gearbox ratios, motor turns per joint turn [-]
+  encoderCounts: [8192, 8192]  # Joint 0 and joint 1 encoder counts per motor revolution, 2048 lines x 4 [counts/rev]
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs [-]; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-12, 160, 14, 235]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [-10, 140]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
+  maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
+  maxEndEffVelCycles: 5  # Consecutive over-limit cycles before the speed e-stop trips (5 = 10 ms at 500 Hz)
 
 v2_unit:
   task_origin: [-0.265, -0.067]  # Shared task-frame origin (centre between shoulders) seen from this shoulder, local axes [m]
@@ -68,10 +72,10 @@ v2_unit:
   drive_node_ids: [1, 4]  # Joint 0 and joint 1 CANopen node IDs
   L1: 0.43  # Proximal link length [m]
   L2: 0.37  # Distal link length [m]
-  parallel_ratio: 1.0  # Parallel linkage ratio
+  parallel_ratio: 1.0  # Parallel linkage ratio [-]
   dqMax: 200  # Maximum joint speed [deg/s]
   tauMax: 30  # Maximum commanded joint torque [N*m]
-  tauSafetyMax: 10  # Measured joint torque stop threshold [N*m]
+  tauSafetyMax: 40  # Measured joint torque stop threshold [N*m]
   qDampingWidth: 15.0  # Joint-limit damping band [deg]
   qDampingGain: 25.0  # Joint-limit damping gain [N*m*s/rad]
   singularityDampingAngleExtended: 20.0  # Damping band before the extended elbow stop [deg]
@@ -84,22 +88,24 @@ v2_unit:
     boundary: 0.02  # Link clearance [m]
     link_A_length: 0.195  # Short parallel-link length [m]
     joint_radius: 0.03  # Joint collision radius [m]
-    end_effector_radius: 0.12  # End-effector circle radius [m]; MUST VERIFY
+    end_effector_radius: 0.06  # End-effector circle radius [m]
     frame:
-      center_x: 0.246  # Frame center x relative to base [m]
-      center_y: 0.1175  # Frame center y relative to base [m]
-      width: 0.49  # Frame width [m]
-      height: 0.235  # Frame height [m]
+      center_x: 0.0  # Frame centre x in this unit's local axes: centred on the shoulder [m]
+      center_y: -0.1845  # Frame centre y in local axes: front edge on the task origin line y=0, 0.235 deep behind it [m]
+      width: 0.49  # Frame size along local x [m]
+      height: 0.235  # Frame size along local y [m]
       boundary: 0.05  # Frame clearance [m]
-  iPeakDrives: [4.091, 4.091]  # Rated (CME2 continuous) current [A]: 1000 drive units = 0x6076 (0.945 N*m) / motorCstt
-  motorCstt: [0.231, 0.231]  # Joint 0 and joint 1 motor torque constants [N*m/A]
-  qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections
-  reductionRatios: [11.083, 11.083]  # Joint 0 and joint 1 gearbox ratios (motor turns per joint turn)
-  encoderCounts: [16384, 16384]  # Joint 0 and joint 1 encoder counts per motor revolution (4096 lines x 4)
-  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs; MUST VERIFY
+  iPeakDrives: [4.091, 4.091]  # Joint 0 and joint 1 rated motor current [A]: 1000 drive torque units = rated torque (0x6076, 0.945 N*m) / motorCstt
+  motorCstt: [0.231, 0.231]  # Joint 0 and joint 1 motor torque constants, motor side [N*m/A]
+  qSigns: [-1, -1]  # Joint 0 and joint 1 direction sign corrections [-]
+  reductionRatios: [11.083, 11.083]  # Joint 0 and joint 1 gearbox ratios, motor turns per joint turn [-]
+  encoderCounts: [16384, 16384]  # Joint 0 and joint 1 encoder counts per motor revolution, 4096 lines x 4 [counts/rev]
+  calibration_direction: [-1, -1]  # Auto-calibration joint torque direction signs [-]; MUST VERIFY
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-17, 160, 8, 235]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [-15.7, 140]  # Joint 0 and joint 1 calibration angles [deg]
   frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
+  maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
+  maxEndEffVelCycles: 5  # Consecutive over-limit cycles before the speed e-stop trips (5 = 10 ms at 500 Hz)

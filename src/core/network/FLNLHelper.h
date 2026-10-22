@@ -101,6 +101,13 @@ class FLNLHelper
         }
 
         /**
+        * \brief True when a client is connected (send may still block if the client is not reading)
+        */
+        bool canSend() {
+            return FLNLServer.IsConnected();
+        }
+
+        /**
         * \brief Allow for reconnection (wait for client)
         */
         void reconnect() {

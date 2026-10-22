@@ -71,11 +71,31 @@ void app_programControlLoop(void) {
         stateMachine->update();
     }
 
-    //Warn if time overflow (this is the effective used time, normally lower than the allocated time period)
-    double dt = (std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::steady_clock::now() - _t0).count()) / 1e6;
-    if(dt>controlLoopPeriodInms/1000.)
-        spdlog::warn("Applicaton thread time overflow: {}ms (>{}ms) !", dt*1000., controlLoopPeriodInms);
+    //Warn if time overflow (this is the effective used time, normally lower than the allocated time period).
+    //Real stalls (> 10 ms) are reported at once; marginal overruns are summed and reported at most
+    //every 2 s, since printing every one from this thread would itself cause more of them.
+    static int overruns = 0;
+    static double worstMs = 0.0;
+    static std::chrono::steady_clock::time_point lastReport = _t0;
+    const auto t1 = std::chrono::steady_clock::now();
+    double dt = (std::chrono::duration_cast<std::chrono::microseconds>(t1 - _t0).count()) / 1e6;
+    if(dt>controlLoopPeriodInms/1000.) {
+        if(dt*1000. > 10.0) {
+            spdlog::warn("Applicaton thread time overflow: {:.1f}ms (>{}ms) !", dt*1000., controlLoopPeriodInms);
+        } else {
+            overruns++;
+            worstMs = std::max(worstMs, dt*1000.);
+        }
+    }
+    if(overruns > 0 && t1 - lastReport > std::chrono::seconds(2)) {
+        spdlog::warn("Applicaton thread time overflow: {} cycle(s) over {}ms in the last 2 s (worst {:.2f}ms)",
+                     overruns, controlLoopPeriodInms, worstMs);
+        overruns = 0;
+        worstMs = 0.0;
+        lastReport = t1;
+    } else if(overruns == 0) {
+        lastReport = t1;
+    }
 }
 
 /******************** Runs at the End of rt_control_thread********************/

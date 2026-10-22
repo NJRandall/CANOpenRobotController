@@ -190,6 +190,9 @@ class RobotMTR : public Robot {
     setMovementReturnCode_t safetyCheck();
     bool hasSafetyTriggered() const { return safetyTriggered_; }
     void clearSafetyTrigger()       { safetyTriggered_ = false; }  // called on EmergencyStop reset
+    // EmergencyStop reset: clears drive faults and confirms every drive reaches Ready to
+    // Switch On with bus voltage present. Leaves the drives disabled; false if any is not ready.
+    bool recoverDrives();
 
     // ── Calibration ───────────────────────────────────────────────────────────
     void applyCalibration();
@@ -215,6 +218,16 @@ class RobotMTR : public Robot {
     double controllerStiffness() const { return controllerStiffness_; }   //!< Spring K [N/m]
     double controllerDamping() const { return controllerDamping_; }       //!< Damping D [N·s/m]
     double alignSpeed() const { return alignSpeed_; }   //!< Max target speed when moving into a reference pose [m/s]
+    bool bimanualAsymmetricSpring() const { return bimanualAsymmetricSpring_; }   //!< Reflect follower spring onto leader
+    double bimanualReflectionRatio() const { return bimanualReflectionRatio_; }     //!< Fraction of follower force reflected
+    //! Live tuning (GUI slider), starting from the YAML values. Ratio 0 switches the asymmetric spring off; any positive ratio switches it on.
+    void setBimanualReflection(double ratio) {
+        bimanualReflectionRatio_ = std::max(0.0, ratio);
+        bimanualAsymmetricSpring_ = ratio > 0.0;
+    }
+    //! Share (0-1) of the YAML friction model applied by friction compensation (GUI slider).
+    double frictionScale() const { return frictionScale_; }
+    void setFrictionScale(double scale) { frictionScale_ = std::min(1.0, std::max(0.0, scale)); }
     double parkStiffness() const { return parkStiffness_; }   //!< Parked-arm joint hold K [N·m/rad]
     double parkDamping() const { return parkDamping_; }       //!< Parked-arm joint hold D [N·m·s/rad]
     double parkMaxTorque() const { return parkMaxTorque_; }   //!< Parked-arm per-joint torque cap [N·m]
@@ -327,6 +340,7 @@ class RobotMTR : public Robot {
     // Friction model — zero until system identification; see MTR_params.yaml
     std::vector<double> frictionVis  = {0.0, 0.0};   //!< Viscous  [N·m·s/rad]
     std::vector<double> frictionCoul = {0.0, 0.0};   //!< Coulomb  [N·m]
+    double frictionScale_ = 1.0;                      //!< Applied share of the model above
 
     // Joint limits [rad] layout: {θ1_min, θ1_max, θ2_min, θ2_max}
     // TODO: LIMITS REMOVED NEED TO BE REINSTATED ONCE HARDWARE VERIFIED — see MTR_params.yaml
@@ -362,6 +376,8 @@ class RobotMTR : public Robot {
         double controllerStiffness_ = 250.0;   // controller_stiffness (YAML) [N/m]
         double controllerDamping_ = 20.0;      // controller_damping (YAML) [N·s/m]
         double alignSpeed_ = 0.05;             // align_speed (YAML) [m/s]
+        bool bimanualAsymmetricSpring_ = false;  // bimanual_asymmetric_spring (YAML)
+        double bimanualReflectionRatio_ = 0.1;   // bimanual_reflection_ratio (YAML) [-]
         double parkStiffness_ = 20.0;          // park_stiffness (YAML) [N·m/rad]
         double parkDamping_ = 1.0;             // park_damping (YAML) [N·m·s/rad]
         double parkMaxTorque_ = 4.0;           // park_max_torque (YAML) [N·m]
@@ -409,7 +425,9 @@ class RobotMTR : public Robot {
     static bool checkDriveAlive(int nodeID);
 
     // ── Safety envelope ───────────────────────────────────────────────────────
-    double maxEndEffVel   = 2.0;    //!< Max end-effector speed      [m/s]
+    double maxEndEffVel   = 2.0;    //!< End-effector speed e-stop [m/s]; YAML maxEndEffVel
+    int    maxEndEffVelCycles = 5;  //!< Consecutive over-limit cycles before the speed e-stop trips; YAML maxEndEffVelCycles
+    int    endEffVelOverCount_ = 0; //!< Current run of consecutive over-limit cycles
     double maxEndEffForce = 20.0;   //!< Max end-effector force (XY) [N]
 
     // ── Cached end-effector state (VX size 2 for FLNLHelper compatibility) ───
