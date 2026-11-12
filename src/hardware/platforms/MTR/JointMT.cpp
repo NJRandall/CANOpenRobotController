@@ -20,6 +20,54 @@ JointMT::~JointMT() {
     delete drive;
 }
 
+bool JointMT::updateValue() {
+    const int rawPos = drive->getPos();
+    const int rawVel = drive->getVel();
+    const double now = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6;
+
+    // Works on raw drive counts, so calibration (a software offset q0) never looks like a jump.
+    // The allowed step grows with the time since the last good sample, so a stalled control
+    // cycle or a held sample is not mistaken for a spike.
+    bool posOk = true, velOk = true;
+    if (haveGoodSample_ && !feedbackFault_) {
+        const double plausibleSpeed = kSpikeFactor * dqMax;   // [rad/s] joint
+        const double maxStep = plausibleSpeed * ((now - lastGoodTime_) + kStepWindowS);
+        posOk = std::abs(driveUnitToJointPosition(rawPos) - driveUnitToJointPosition(lastGoodPos_)) <= maxStep;
+        velOk = std::abs(driveUnitToJointVelocity(rawVel)) <= plausibleSpeed;
+    }
+
+    if (posOk && velOk) {
+        badSampleCount_ = 0;
+    } else if (!feedbackFault_) {
+        badSampleCount_++;
+        spdlog::warn("JointMT {} ({}): rejected drive feedback {}/{}: pos 0x{:08x} ({:.1f} deg, last good {:.1f} deg){}, "
+                     "vel 0x{:08x} ({:.1f} deg/s){}", id, name, badSampleCount_, kMaxBadSamples,
+                     (uint32_t)rawPos, (driveUnitToJointPosition(rawPos) - q0) * 180.0 / M_PI,
+                     (driveUnitToJointPosition(lastGoodPos_) - q0) * 180.0 / M_PI, posOk ? "" : " BAD",
+                     (uint32_t)rawVel, driveUnitToJointVelocity(rawVel) * 180.0 / M_PI, velOk ? "" : " BAD");
+        if (badSampleCount_ >= kMaxBadSamples) {
+            spdlog::error("JointMT {} ({}): drive feedback implausible for {} consecutive cycles.",
+                          id, name, badSampleCount_);
+            feedbackFault_ = true;
+        }
+    }
+
+    // Once faulted, pass the raw values through: the robot e-stops on feedbackFault() anyway.
+    if (posOk || feedbackFault_) {
+        lastGoodPos_ = rawPos;
+        lastGoodTime_ = now;
+    }
+    if (velOk || feedbackFault_)
+        lastGoodVel_ = rawVel;
+    haveGoodSample_ = true;
+
+    position = driveUnitToJointPosition(lastGoodPos_) - q0;
+    velocity = driveUnitToJointVelocity(lastGoodVel_);
+    torque = updateTorque();
+    return true;
+}
+
 setMovementReturnCode_t JointMT::safetyCheck() {
     if (velocity > dqMax || velocity < dqMin) {
         static int velErrCount = 0;

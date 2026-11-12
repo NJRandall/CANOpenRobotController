@@ -10,7 +10,7 @@ midline_influence_distance: 0.08  # Mirror mode: leader is pushed back within th
 midline_spring_gain: 1.0  # Mirror-mode midline exponential spring gain [N] (~13 N at the line)
 midline_decay_length: 0.03  # Mirror-mode midline spring length scale [m]
 midline_damping_gain: 30  # Mirror-mode midline closing-speed damping [N*s/m]
-controller_stiffness: 100  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
+controller_stiffness: 300  # Spring K for hold/mimic/mirror/parked arm [N/m]; 20 N cap reached at 20/K m error
 controller_damping: 20  # Damping D for the same controllers [N*s/m]
 align_speed: 0.05  # Max speed the target moves into a mimic/mirror/parked reference on entry [m/s]
 bimanual_asymmetric_spring: true  # Bimanual: reflect a weaker follower spring-damper back onto the leader
@@ -59,8 +59,8 @@ v1_unit:
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-12, 160, 14, 235]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [-10, 140]  # Joint 0 and joint 1 calibration angles [deg]
-  frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
-  frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
+  frictionVis: [0, 0]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
+  frictionCoul: [0, 0]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
   maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
   maxEndEffVelCycles: 5  # Consecutive over-limit cycles before the speed e-stop trips (5 = 10 ms at 500 Hz)
@@ -104,7 +104,7 @@ v2_unit:
   calibration_torque: [2.6, 2.0]  # Auto-calibration joint torque magnitudes [N*m]; MUST VERIFY
   qLimits: [-17, 160, 8, 235]  # Joint 0 and joint 1 angle limits [deg]
   qCalibration: [-15.7, 140]  # Joint 0 and joint 1 calibration angles [deg]
-  frictionVis: [0.33, 0.76]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
+  frictionVis: [0.25, 0.6]  # Joint 0 and joint 1 viscous friction [N*m*s/rad]
   frictionCoul: [0.35, 0.19]  # Joint 0 and joint 1 Coulomb friction [N*m]
   maxEndEffForce: 20.0  # Maximum end-effector force [N]
   maxEndEffVel: 2.0  # End-effector speed e-stop threshold [m/s]
