@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <chrono>
 
 #include "Joint.h"
 #include "CopleyDrive.h"
@@ -58,6 +59,20 @@ class JointMT : public Joint {
     double driveUnitToJointTorque(int driveValue) { return sign * driveValue / 1000.0 * motorTorqueConstant * Ipeak * reductionRatio; };
     int jointTorqueToDriveUnit(double jointValue) { return (int)(sign * jointValue / (motorTorqueConstant * Ipeak) * 1000.0 / reductionRatio); };
 
+    // ── Feedback plausibility filter (see updateValue()) ──────────────────────
+    // The drives' actual position/velocity PDOs occasionally deliver a single absurd
+    // sample (e.g. 16720 deg, 3250 m/s). Such a sample is replaced by the last good one;
+    // a run of kMaxBadSamples latches feedbackFault() instead.
+    static constexpr double kSpikeFactor   = 5.0;   //!< Plausible speed = kSpikeFactor × dqMax
+    static constexpr double kStepWindowS   = 0.01;  //!< Slack added to the elapsed time for the position step [s]
+    static constexpr int    kMaxBadSamples = 5;     //!< Consecutive rejected cycles before the fault latches
+    bool   haveGoodSample_ = false;
+    int    lastGoodPos_ = 0;                        //!< Raw drive counts
+    int    lastGoodVel_ = 0;                        //!< Raw drive units
+    double lastGoodTime_ = 0.0;                     //!< steady_clock time of lastGoodPos_ [s]
+    int    badSampleCount_ = 0;
+    bool   feedbackFault_ = false;
+
    public:
     //! True once setMode(CM_TORQUE_CONTROL) has configured the drive (0x6060 persists).
     bool inTorqueMode() const { return driveMode == CM_TORQUE_CONTROL; }
@@ -69,6 +84,11 @@ class JointMT : public Joint {
      * \return OUTSIDE_LIMITS if outside the limits (!), SUCCESS otherwise
      */
     setMovementReturnCode_t safetyCheck();
+
+    /** Reads the drive feedback, replacing an implausible position/velocity sample with the last good one. */
+    bool updateValue() override;
+    /** True once kMaxBadSamples consecutive feedback samples were rejected (latched). */
+    bool feedbackFault() const { return feedbackFault_; }
 
     setMovementReturnCode_t setPosition(double qd);
     setMovementReturnCode_t setVelocity(double dqd);

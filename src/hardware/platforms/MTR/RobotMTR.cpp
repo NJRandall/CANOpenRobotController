@@ -883,6 +883,12 @@ void RobotMTR::printDriveDiagnostics() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 setMovementReturnCode_t RobotMTR::safetyCheck() {
+    for (unsigned int i = 0; i < joints.size(); i++) {
+        if (((JointMT *)joints[i])->feedbackFault()) {
+            spdlog::error("MTR {}: Joint {} drive feedback fault!", robotName, i);
+            return OUTSIDE_LIMITS;
+        }
+    }
     if (calibrated) {
         if (calibGraceCycles_ > 0) { calibGraceCycles_--; return SUCCESS; }
         for (unsigned int i = 0; i < joints.size(); i++) {
